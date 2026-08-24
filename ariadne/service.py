@@ -198,11 +198,26 @@ def list_children_detailed() -> list:
 
 
 # ── public service API used by the tool ──────────────────────────────────
+_atexit_registered = False
+
+
+def _register_exit_cleanup() -> None:
+    """Parent teardown must not orphan the kernel process (Prime parity)."""
+    global _atexit_registered
+    if _atexit_registered:
+        return
+    import atexit
+
+    atexit.register(shutdown_kernel)
+    _atexit_registered = True
+
+
 def start_kernel() -> Dict[str, Any]:
     global _manager
     _inject_runtime_on_syspath()
     runtime_dir, _ = _runtime_dirs()
     from ariadne.kernel_manager import KernelManager
+    _register_exit_cleanup()
     with _lock:
         if _manager is not None and _manager.is_running():
             return {"already_running": True, "host_endpoint": _manager.host_endpoint}
