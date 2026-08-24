@@ -271,6 +271,82 @@ class TaskStore:
             self._refresh_mirror(task_id)
         return ok
 
+    def insert_task(self, plan_id: str, spec: Dict[str, Any]) -> str:
+        """Insert one additional task into an EXISTING plan (Phase 10).
+
+        Id is scoped under plan_id like create_plan; deps must reference
+        tasks already in that plan (or the new task's own id).
+        Returns the scoped task id.
+        """
+        now = time.time()
+        cleaned = self._validate([spec], prefix=plan_id)
+        t = cleaned[0]
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO tasks(id,plan_id,kind,title,payload,depends_on,"
+                "state,max_attempts,created_at) VALUES(?,?,?,?,?,?,'pending',"
+                "?,?)",
+                (t["id"], plan_id, t["kind"], t["title"],
+                 json.dumps(t["payload"]), json.dumps(t["depends_on"]),
+                 int(t["max_attempts"]), now))
+            self._conn.commit()
+        try:
+            self._mirror_node(t["id"], t["title"])
+        except Exception:
+            pass
+        return t["id"]
+
+    def rename_task(self, task_id: str, title: str) -> None:
+        """In-place title update -- never triggers a rebuild."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE tasks SET title=? WHERE id=?",
+                (title.strip()[:120], task_id))
+            self._conn.commit()
+        self._refresh_mirror(task_id)
+
+    def insert_task(self, plan_id: str, spec: Dict[str, Any],
+                    *, scope: bool = True) -> str:
+        """Insert one additional task into an EXISTING plan (Phase 10).
+
+        Id is scoped under plan_id unless scope=False (caller already
+        normalized). Deps must reference tasks in that plan.
+        Returns the scoped task id.
+        """
+        kind = str(spec.get("kind") or "note").lower()
+        if kind not in TASK_KINDS:
+            raise ValueError(f"insert_task: bad kind {kind!r}")
+        base = _slug(str(spec.get("id") or spec.get("title") or kind))
+        nid = f"{plan_id}-{base}" if scope else str(spec.get("id"))
+        title = str(spec.get("title") or "").strip() or f"{kind}: {base}"
+        raw_deps = [str(d) for d in (spec.get("depends_on") or [])]
+        deps = []
+        for d in raw_deps:
+            if scope and not d.startswith(plan_id + "-"):
+                d = f"{plan_id}-{d}"
+            deps.append(d)
+        with self._lock:
+            for d in deps:
+                row = self._conn.execute(
+                    "SELECT 1 FROM tasks WHERE id=?", (d,)).fetchone()
+                if row is None and d != nid:
+                    raise ValueError(
+                        f"insert_task({nid}): unknown dependency {d}")
+            self._conn.execute(
+                "INSERT INTO tasks(id,plan_id,kind,title,payload,depends_on,"
+                "state,max_attempts,created_at) VALUES(?,?,?,?,?,?,'pending',"
+                "?,?)",
+                (nid, plan_id, kind, title,
+                 json.dumps(spec.get("payload") or {}, default=str),
+                 json.dumps(deps),
+                 max(1, min(5, int(spec.get("max_attempts") or 1))), time.time()))
+            self._conn.commit()
+        try:
+            self._mirror_node(nid, title)
+        except Exception:
+            pass
+        return nid
+
     def ready_tasks(self, plan_id: str) -> List[Dict[str, Any]]:
         """Tasks runnable now: deps all done OR bypassed (gate-skip is ok)."""
         tasks = {
