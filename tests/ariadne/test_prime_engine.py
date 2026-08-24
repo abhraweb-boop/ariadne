@@ -28,7 +28,7 @@ def engine():
 def test_start_and_state_handshake(engine):
     st = engine.state(timeout_s=5)
     assert st["success"] is True
-    assert st["result"]["model"] == "fake-model"
+    assert st["data"]["model"] == "fake-model"
 
 
 def test_prompt_returns_final_text(engine):
@@ -41,12 +41,11 @@ def test_prompt_returns_final_text(engine):
 def test_steer_roundtrip(engine):
     res = engine.steer("change approach", timeout_s=5)
     assert res["success"] is True
-    assert res["result"]["steered"] is True
 
 
 def test_new_session(engine):
     res = engine.new_session(timeout_s=5)
-    assert res["result"]["session"] == "sess-2"
+    assert res["data"]["cancelled"] is False
 
 
 def test_crlf_tolerated(engine):
@@ -80,5 +79,5 @@ def test_request_timeout_surfaces():
     e = make_engine(request_timeout_s=0.05)
     e.start()
     with pytest.raises(TimeoutError):
-        e.state(timeout_s=0.05)
+        e._request("sleep", {"s": 0.5}, timeout_s=0.05)
     e.stop()

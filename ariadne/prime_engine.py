@@ -1,13 +1,16 @@
 """PrimeEngine -- drives vendored prime-agent over `--mode rpc` (JSONL).
 
-Phase-7 seam. All protocol specifics live here (adapter contract): spawn,
-framing (strict \\n out, trailing \\r tolerated in), request/response ids,
-streaming events. Upstream drift ever touches exactly this file plus its
-fixtures.
+Wire format (decoded from vendor/prime-agent rpc-types.ts / rpc-mode.ts /
+rpc-client.ts -- the adapter contract lives here):
 
-Auth: provider env vars pass through at spawn. A missing key is NEVER an
-exception path — the engine surfaces structured no_key states from upstream
-or its own pre-flight (`{"ok": false, "error": "no_key", ...}`).
+    request   : {"id": "<rid>", "type": "<command>", ...payload}
+    response  : {"id": "<rid>", "type": "response", "command": "<command>",
+                 "success": bool, "data"?: object, "error"?: string}
+    events    : any other JSON line (agent stream); terminal = agent_end
+
+Prompt flow: ACK response arrives first, agent events stream, run ends with
+an `agent_end` event; final text is fetched via `get_last_assistant_text`.
+Upstream drift ever touches exactly this file plus fixtures.
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ import subprocess
 import threading
 import time
 import uuid
+from collections import deque
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -44,61 +48,79 @@ class PrimeEngine:
         provider: Optional[str] = None,
         cwd: Optional[str] = None,
         request_timeout_s: float = 180.0,
+        env_passthrough: bool = True,
     ) -> None:
         self._command = list(command or _DEFAULT_COMMAND)
         self._model = model
         self._provider = provider
         self._cwd = cwd
         self._default_timeout = request_timeout_s
+        self._env_passthrough = env_passthrough
         self._proc: Optional[subprocess.Popen] = None
         self._lock = threading.RLock()
-        self._pending: Dict[str, Dict[str, Any]] = {}  # id -> {"event": Event, "resp": ...}
+        self._pending: Dict[str, Dict[str, Any]] = {}
         self._events: List[Dict[str, Any]] = []
-        self._reader: Optional[threading.Thread] = None
+        self._event_ping = threading.Condition(self._lock)
+        self._stderr_tail: deque = deque(maxlen=40)
         self._alive = False
 
     # ── lifecycle ──────────────────────────────────────────────────────────
     def start(self) -> None:
         if self._alive:
             return
+        env = os.environ.copy() if self._env_passthrough else None
         self._proc = subprocess.Popen(
             self._command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             cwd=self._cwd,
+            env=env,
         )
         self._alive = True
-        self._reader = threading.Thread(
-            target=self._read_loop, name="prime-rpc-reader", daemon=True)
-        self._reader.start()
+        threading.Thread(target=self._read_loop, name="prime-rpc-reader",
+                         daemon=True).start()
+        threading.Thread(target=self._stderr_loop, name="prime-rpc-stderr",
+                         daemon=True).start()
 
     @property
     def pid(self) -> Optional[int]:
         return self._proc.pid if self._proc else None
 
+    def stderr_summary(self) -> str:
+        return " | ".join(self._stderr_tail)[-600:]
+
     def stop(self) -> None:
         self._alive = False
-        if self._proc is None:
+        proc = self._proc
+        self._proc = None
+        if proc is None:
             return
         try:
-            if self._proc.stdin:
-                self._proc.stdin.close()
+            if proc.stdin:
+                proc.stdin.close()
         except Exception:
             pass
         try:
-            self._proc.terminate()
-            self._proc.wait(timeout=5)
+            proc.terminate()
+            proc.wait(timeout=5)
         except Exception:
             pass
-        if os.name == "nt" and self._proc.poll() is None:
-            subprocess.run(["taskkill", "/PID", str(self._proc.pid), "/T", "/F"],
+        if os.name == "nt" and proc.poll() is None:
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
                            capture_output=True)
-        self._proc = None
+        with self._lock:
+            waiters = list(self._pending.items())
+            self._pending.clear()
+        for _, entry in waiters:
+            entry["resp"] = {"success": False, "error": "engine stopped"}
+            entry["event"].set()
 
     # ── requests ───────────────────────────────────────────────────────────
     def state(self, timeout_s: Optional[float] = None) -> Dict[str, Any]:
-        return self._request("get_state", {}, timeout_s)
+        resp = self._request("get_state", {}, timeout_s)
+        resp["data"] = resp.get("data") or {}
+        return resp
 
     def new_session(self, timeout_s: Optional[float] = None) -> Dict[str, Any]:
         return self._request("new_session", {}, timeout_s)
@@ -107,29 +129,42 @@ class PrimeEngine:
               timeout_s: Optional[float] = None) -> Dict[str, Any]:
         return self._request("steer", {"message": text}, timeout_s)
 
+    def last_text(self, timeout_s: Optional[float] = None) -> str:
+        resp = self._request("get_last_assistant_text", {}, timeout_s)
+        data = resp.get("data")
+        if isinstance(data, dict):
+            return str(data.get("text") or "")
+        return str(data or "")
+
     def prompt(
         self,
         text: str,
         *,
-        stream: bool = False,
         streaming_behavior: str = "followUp",
         model: Optional[str] = None,
         timeout_s: Optional[float] = None,
     ) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
-            "text": text, "streamingBehavior": streaming_behavior}
-        if model or self._model:
-            payload["model"] = model or self._model
         marker = len(self._events)
-        resp = self._request("prompt", payload, timeout_s)
-        events = [e for e in self._events[marker:]
-                  if e.get("id") == resp.get("id")]
-        ok = bool(resp.get("success"))
-        result = resp.get("result") or {}
-        text_out = result.get("text") if isinstance(result, dict) else None
+        payload: Dict[str, Any] = {
+            "message": text, "streamingBehavior": streaming_behavior}
+        ack = self._request("prompt", payload, min(60.0, self._default_timeout))
+        if not ack.get("success"):
+            return {"ok": False, "text": "", "events": [], "raw": ack}
+        ended = self._wait_for_event(
+            "agent_end",
+            timeout_s if timeout_s is not None else self._default_timeout,
+            after=marker)
+        events = [e for e in self._events[marker:]]
+        if not ended:
+            return {
+                "ok": False, "text": self.last_text(15), "events": events,
+                "raw": {"success": False,
+                        "error": ("timeout waiting for agent_end; "
+                                  f"stderr: {self.stderr_summary()}")},
+            }
         return {
-            "ok": ok, "text": text_out or "",
-            "events": events, "raw": resp,
+            "ok": True, "text": self.last_text(30),
+            "events": events, "raw": ack,
         }
 
     # ── internals ──────────────────────────────────────────────────────────
@@ -141,10 +176,10 @@ class PrimeEngine:
         entry = {"event": threading.Event(), "resp": None}
         with self._lock:
             self._pending[rid] = entry
-        msg = {"id": rid, "type": "request", "command": command, **extra}
-        line = (json.dumps(msg) + "\n").encode("utf-8")
+        msg = {"id": rid, "type": command, **extra}
         try:
-            self._proc.stdin.write(line)
+            self._proc.stdin.write(
+                (json.dumps(msg) + "\n").encode("utf-8"))
             self._proc.stdin.flush()
         except Exception as exc:
             with self._lock:
@@ -155,12 +190,24 @@ class PrimeEngine:
         if not entry["event"].wait(timeout=max(0.01, deadline)):
             with self._lock:
                 self._pending.pop(rid, None)
-            raise TimeoutError(f"rpc timeout after {deadline}s ({command})")
-        resp = entry["resp"] or {}
-        if isinstance(resp.get("result"), dict) and \
-                resp["result"].get("error") == "no_key":
-            logger.info("prime engine reports missing provider key")
-        return resp
+            exited = self._proc.poll() if self._proc else None
+            raise TimeoutError(
+                f"rpc timeout after {deadline}s ({command})"
+                + (f"; process exited code={exited}; "
+                   f"stderr: {self.stderr_summary()}" if exited is not None else ""))
+        return entry["resp"] or {}
+
+    def _wait_for_event(self, name: str, timeout_s: float,
+                        *, after: int = 0) -> bool:
+        deadline = time.time() + max(0.05, timeout_s)
+        with self._event_ping:
+            while True:
+                if any(e.get("type") == name for e in self._events[after:]):
+                    return True
+                remaining = deadline - time.time()
+                if remaining <= 0 or not self._alive:
+                    return False
+                self._event_ping.wait(timeout=min(0.25, remaining))
 
     def _read_loop(self) -> None:
         proc = self._proc
@@ -174,29 +221,38 @@ class PrimeEngine:
             try:
                 msg = json.loads(line)
             except json.JSONDecodeError:
-                logger.debug("prime rpc: unparsable line %r", line[:120])
+                logger.debug("prime rpc: unparsable %r", line[:120])
                 continue
-            if msg.get("type") == "response":
+            if isinstance(msg, dict) and msg.get("type") == "response":
                 with self._lock:
                     entry = self._pending.pop(str(msg.get("id")), None)
                 if entry:
                     entry["resp"] = msg
                     entry["event"].set()
-            elif msg.get("type") == "event":
-                with self._lock:
-                    self._events.append({
-                        "id": msg.get("id"),
-                        "event": msg.get("event"),
-                        "data": msg.get("data"),
-                        "ts": time.time(),
-                    })
-        # EOF: fail all waiters fast
+                continue
+            with self._event_ping:
+                self._events.append(msg)
+                self._event_ping.notify_all()
         with self._lock:
             waiters = list(self._pending.items())
             self._pending.clear()
         for _, entry in waiters:
-            entry["resp"] = {"success": False, "error": "engine exited"}
+            exited = proc.poll()
+            entry["resp"] = {
+                "success": False,
+                "error": (f"engine exited code={exited}; "
+                          f"stderr: {self.stderr_summary()}"),
+            }
             entry["event"].set()
+
+    def _stderr_loop(self) -> None:
+        proc = self._proc
+        assert proc is not None and proc.stderr is not None
+        for raw in proc.stderr:
+            line = raw.decode("utf-8", errors="replace").rstrip()
+            if line:
+                with self._lock:
+                    self._stderr_tail.append(line[:200])
 
 
 # ── singleton ──────────────────────────────────────────────────────────────
@@ -207,7 +263,7 @@ def get_engine() -> PrimeEngine:
     """Config-gated shared engine (ariadne.prime.enabled)."""
     global _engine
     if _engine is None:
-        enabled = False
+        enabled = True
         try:
             from hermes_cli.config import load_config
 
@@ -218,13 +274,11 @@ def get_engine() -> PrimeEngine:
         if not enabled:
             raise RuntimeError(
                 "prime engine disabled by config (ariadne.prime.enabled=false)")
-        try:
-            _engine = PrimeEngine()
-            _engine.start()
-        except FileNotFoundError as exc:
+        if not Path(_DEFAULT_COMMAND[1]).exists():
             raise RuntimeError(
-                "prime bundle missing — run scripts/build-prime.sh "
-                f"({exc})") from exc
+                "prime bundle missing — run scripts/build-prime.sh")
+        _engine = PrimeEngine()
+        _engine.start()
     return _engine
 
 

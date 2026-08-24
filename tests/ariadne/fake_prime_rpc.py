@@ -1,8 +1,8 @@
-"""Fake prime-agent RPC responder: JSONL over stdin/stdout, CRLF-tolerant.
+"""Fake prime-agent RPC responder: real wire format (type IS the command).
 
-Stands in for `prime-agent --mode rpc` during engine tests. Mirrors the
-documented protocol shape: {"id","type":"response","command","success","result"}
-plus streaming events (message_update / agent_end) before prompt responses.
+Mirrors vendor/prime-agent's actual protocol: requests {"id","type",...},
+responses {"id","type":"response","command","success","data"|"error"},
+agent events stream as bare objects, terminal event `agent_end`.
 """
 import json
 import sys
@@ -25,29 +25,33 @@ def main():
             req = json.loads(raw)
         except json.JSONDecodeError:
             continue
-        cmd = req.get("command")
+        cmd = req.get("type")
         rid = req.get("id")
         if cmd == "get_state":
             emit({"id": rid, "type": "response", "command": "get_state",
                   "success": True,
-                  "result": {"model": "fake-model", "session": f"s-{session}"}})
+                  "data": {"model": "fake-model", "session": f"s-{session}"}})
         elif cmd == "new_session":
             session += 1
             emit({"id": rid, "type": "response", "command": "new_session",
-                  "success": True, "result": {"session": f"sess-{session+1}"}})
+                  "success": True, "data": {"cancelled": False}})
         elif cmd == "steer":
             emit({"id": rid, "type": "response", "command": "steer",
-                  "success": True, "result": {"steered": True}})
+                  "success": True})
+        elif cmd == "sleep":
+            time.sleep(float(req.get("s", 0.2)))
+        elif cmd == "get_last_assistant_text":
+            emit({"id": rid, "type": "response",
+                  "command": "get_last_assistant_text",
+                  "success": True, "data": {"text": "fake answer"}})
         elif cmd == "prompt":
-            # simulate streaming: a couple of events then final response
-            emit({"id": rid, "type": "event", "event": "message_update",
-                 "data": {"delta": "..."}}, crlf=True)
-            time.sleep(0.02)
-            emit({"id": rid, "type": "event", "event": "agent_end",
-                 "data": {}}, crlf=True)
+            # ACK first, then stream events, terminal agent_end
             emit({"id": rid, "type": "response", "command": "prompt",
-                  "success": True,
-                  "result": {"text": "fake answer"}})
+                  "success": True}, crlf=True)
+            time.sleep(0.02)
+            emit({"type": "message_update", "data": {"delta": "..."}},
+                 crlf=True)
+            emit({"type": "agent_end"})
         else:
             emit({"id": rid, "type": "response", "command": cmd,
                   "success": False, "error": f"unknown command {cmd}"})
