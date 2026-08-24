@@ -295,6 +295,12 @@ TOOLSETS = {
         "tools": ["execute_code"],
         "includes": []
     },
+
+    "ariadne": {
+        "description": "Persistent IPython kernel + rlm() recursive subagents (state survives across turns)",
+        "tools": ["ariadne_kernel"],
+        "includes": []
+    },
     
     "delegation": {
         "description": "Spawn subagents with isolated context for complex subtasks",

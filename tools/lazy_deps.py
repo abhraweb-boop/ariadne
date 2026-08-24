@@ -128,6 +128,15 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
         "opentelemetry-exporter-otlp-proto-http==1.39.1",
     ),
 
+    # ─── Ariadne persistent kernel ────────────────────────────────────────
+    # ipykernel + pyzmq for the persistent-kernel subsystem. Tracks the
+    # `ariadne` extra in pyproject.toml — bump both together. pyzmq pinned to
+    # a mature release (2025-09) so uv's exclude-newer freshness gate passes.
+    "ariadne.kernel": (
+        "ipykernel==7.3.0",
+        "pyzmq==27.1.0",
+    ),
+
     # ─── TTS providers ─────────────────────────────────────────────────────
     # Pinned to exact versions to match pyproject.toml's no-ranges policy
     # (see comment at top of [project.dependencies]). When bumping, update
