@@ -3013,6 +3013,11 @@ def _git_path(path: str) -> str:
 from hermes_cli.web_routers import git as _git_routes  # noqa: E402
 
 app.include_router(_git_routes.router)
+# Ariadne context-graph REST surface (Phase 3 store, Phase 4 desktop panel).
+from hermes_cli.web_routers import ariadne_graph as _ariadne_graph_routes  # noqa: E402
+
+app.include_router(_ariadne_graph_routes.router)
+
 from hermes_cli.web_routers.git import (  # noqa: E402,F401 — legacy re-exports; tests call these via web_server.<name>
     git_status_route,
     git_worktrees_route,
