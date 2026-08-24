@@ -8,6 +8,7 @@ Where stock Hermes treats every session as fresh context, Ariadne layers a resea
 - **Recursive `rlm()`** — subagent lifecycle service (`ariadne/service.py`) for spawning scoped child workers whose results flow back into the parent thread.
 - **`/refine` memory ledger** — `ariadne_runtime/refine.py` writes every refinement into a SQLite ledger at 10× retention granularity; conclusions compound instead of evaporating.
 - **Context graph + waterfall loader** — `plugins/context_graph/` builds a live graph of session entities/artifacts and loads relevant context waterfall-style (nearest-first), surfaced in the desktop app's `/graph` panel.
+- **Graph execution (Phase 6)** — plans are executable task DAGs (`ariadne_plan` / `ariadne_exec`): the executor walks topological order with parallel branches, `{{task.result}}` artifact passing, per-task retries, and cascade-skip failure routing — the graph *is* the loop, not just its memory. See [`docs/architecture-ariadne-phase6.md`](docs/architecture-ariadne-phase6.md).
 - **Packaged desktop app** — rebranded Electron build (`Ariadne`) with installers under `apps/desktop/release/`.
 
 ## Status

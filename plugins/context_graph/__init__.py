@@ -186,6 +186,9 @@ def _on_session_end(**kwargs: Any) -> None:
         flush()
     finally:
         close_store()
+        from plugins.context_graph import plan_tool
+
+        plan_tool.close_store()
 
 
 # ── waterfall loader (pre_llm_call context injection) ────────────────────
@@ -325,4 +328,22 @@ def register(ctx) -> None:
         handler=lambda args, **kw: handle_ariadne_graph(args, **kw),
         description="Context graph over Ariadne's work: related subgraphs, "
                     "timelines, stats.",
+    )
+    from plugins.context_graph import plan_tool
+
+    ctx.register_tool(
+        name=plan_tool._PLAN_TOOL,
+        toolset="ariadne",
+        schema=plan_tool.PLAN_SCHEMA,
+        handler=lambda args, **kw: plan_tool.handle_ariadne_plan(args, **kw),
+        description="Create/manage executable task DAGs (graph-engineered "
+                    "plans).",
+    )
+    ctx.register_tool(
+        name=plan_tool._EXEC_TOOL,
+        toolset="ariadne",
+        schema=plan_tool.EXEC_SCHEMA,
+        handler=lambda args, **kw: plan_tool.handle_ariadne_exec(args, **kw),
+        description="Execute/resume task DAGs: topo-order executor with "
+                    "parallel branches, retries, cascade-skip.",
     )

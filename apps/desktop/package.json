@@ -2,7 +2,7 @@
   "name": "hermes",
   "productName": "Ariadne",
   "private": true,
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "Native desktop shell for Ariadne (Hermes Agent fork).",
   "author": "Nous Research",
   "repository": {
