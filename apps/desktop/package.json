@@ -1,9 +1,9 @@
 {
   "name": "hermes",
-  "productName": "Hermes",
+  "productName": "Ariadne",
   "private": true,
   "version": "0.17.0",
-  "description": "Native desktop shell for Hermes Agent.",
+  "description": "Native desktop shell for Ariadne (Hermes Agent fork).",
   "author": "Nous Research",
   "repository": {
     "type": "git",
@@ -187,9 +187,9 @@
   },
   "build": {
     "electronVersion": "40.10.2",
-    "appId": "com.nousresearch.hermes",
-    "productName": "Hermes",
-    "executableName": "Hermes",
+    "appId": "com.ariadne.agent",
+    "productName": "Ariadne",
+    "executableName": "Ariadne",
     "protocols": [
       {
         "name": "Hermes Protocol",
@@ -198,7 +198,7 @@
         ]
       }
     ],
-    "artifactName": "Hermes-${version}-${os}-${arch}.${ext}",
+    "artifactName": "Ariadne-${version}-${os}-${arch}.${ext}",
     "icon": "assets/icon",
     "directories": {
       "output": "release"
@@ -234,9 +234,9 @@
       "entitlements": "electron/entitlements.mac.plist",
       "entitlementsInherit": "electron/entitlements.mac.inherit.plist",
       "extendInfo": {
-        "CFBundleDisplayName": "Hermes",
-        "CFBundleExecutable": "Hermes",
-        "CFBundleName": "Hermes",
+        "CFBundleDisplayName": "Ariadne",
+        "CFBundleExecutable": "Ariadne",
+        "CFBundleName": "Ariadne",
         "NSAudioCaptureUsageDescription": "Hermes uses audio capture for voice conversations.",
         "NSCameraUsageDescription": "Hermes uses the camera when a plugin or feature you enable requests it.",
         "NSMicrophoneUsageDescription": "Hermes uses the microphone for voice input and voice conversations."
@@ -249,7 +249,7 @@
       ]
     },
     "dmg": {
-      "title": "Install Hermes",
+      "title": "Install Ariadne",
       "backgroundColor": "#f5f5f7",
       "iconSize": 96,
       "window": {
@@ -271,7 +271,7 @@
       ]
     },
     "win": {
-      "legalTrademarks": "Hermes",
+      "legalTrademarks": "Ariadne",
       "target": [
         "nsis",
         "msi"
@@ -281,7 +281,7 @@
     "linux": {
       "category": "Development",
       "maintainer": "Nous Research <support@nousresearch.com>",
-      "synopsis": "Native desktop shell for Hermes Agent.",
+      "synopsis": "Native desktop shell for Ariadne.",
       "target": [
         "AppImage",
         "deb",
@@ -292,8 +292,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
-      "shortcutName": "Hermes",
-      "uninstallDisplayName": "Hermes",
+      "shortcutName": "Ariadne",
+      "uninstallDisplayName": "Ariadne",
       "warningsAsErrors": false
     }
   }
