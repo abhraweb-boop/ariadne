@@ -14,7 +14,7 @@ export const NODE_TYPE_META: Record<
   cmd: { label: 'Command', color: '#e0af68', glyph: '▸' },
   web: { label: 'Web', color: '#bb9af7', glyph: '◇' },
   url: { label: 'URL', color: '#bb9af7', glyph: '◇' },
-  search: { label: 'Search', color: '#565f89', glyph: '○' }
+  search: { label: 'Search', color: '#7b86aa', glyph: '○' }
 }
 
 export function metaFor(type: string): { label: string; color: string; glyph: string } {

@@ -79,6 +79,7 @@ describe('layoutGraph', () => {
     const { nodes: laid } = layoutGraph(sameLane, [])
     const ys = laid.map(n => n.y)
     expect(new Set(ys).size).toBe(ys.length) // no overlap
+
     // zz.py (99) is newer than nothing else here; single-lane ordering check:
     if (laid.length === 2) {
       expect(laid[0].y).toBeLessThan(laid[1].y)
