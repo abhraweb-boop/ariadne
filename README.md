@@ -1,15 +1,16 @@
-# Ariadne
+# Prime Hermes
 
-**A persistent-memory research agent** — a fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) that gives a coding/research agent an evolving memory of its own work.
+**A persistent-memory, graph-engineered build agent** — a fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) (formerly **Ariadne**) that plans work as executable task graphs and remembers its own conclusions.
 
-Where stock Hermes treats every session as fresh context, Ariadne layers a research loop on top:
+Where stock Hermes treats every session as fresh context, Prime Hermes layers a research loop on top:
 
 - **Persistent IPython kernel** — long-lived kernel sessions managed via `ariadne/kernel_manager.py`, so exploration survives across turns instead of dying with each tool call.
 - **Recursive `rlm()`** — subagent lifecycle service (`ariadne/service.py`) for spawning scoped child workers whose results flow back into the parent thread.
 - **`/refine` memory ledger** — `ariadne_runtime/refine.py` writes every refinement into a SQLite ledger at 10× retention granularity; conclusions compound instead of evaporating.
 - **Context graph + waterfall loader** — `plugins/context_graph/` builds a live graph of session entities/artifacts and loads relevant context waterfall-style (nearest-first), surfaced in the desktop app's `/graph` panel.
 - **Graph execution (Phase 6)** — plans are executable task DAGs (`ariadne_plan` / `ariadne_exec`): the executor walks topological order with parallel branches, `{{task.result}}` artifact passing, per-task retries, and cascade-skip failure routing — the graph *is* the loop, not just its memory. See [`docs/architecture-ariadne-phase6.md`](docs/architecture-ariadne-phase6.md).
-- **Packaged desktop app** — rebranded Electron build (`Ariadne`) with installers under `apps/desktop/release/`.
+- **Prime engine** — vendored [prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) driven over RPC as a `prime` DAG kind / `ariadne_prime` tool; autonomy tiers `governed | unleashed`.
+- **Packaged desktop app** — rebranded Electron build (**Prime Hermes**) with installers under `apps/desktop/release/`.
 
 ## Status
 
@@ -30,7 +31,7 @@ cd apps/desktop && npm ci && npm run dev   # desktop shell
 
 The agent core, CLI, skills, and plugin system are unchanged from upstream — see [`HERMES-README.md`](HERMES-README.md) for full documentation of the underlying platform, including `hermes setup`, providers, gateway platforms, and plugin authoring.
 
-## Layout (Ariadne-specific)
+## Layout (Prime Hermes-specific)
 
 ```
 ariadne/                  kernel manager + rlm() subagent service

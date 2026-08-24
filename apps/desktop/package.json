@@ -1,6 +1,6 @@
 {
   "name": "hermes",
-  "productName": "Ariadne",
+  "productName": "Prime Hermes",
   "private": true,
   "version": "0.18.0",
   "description": "Native desktop shell for Ariadne (Hermes Agent fork).",
@@ -188,7 +188,7 @@
   "build": {
     "electronVersion": "40.10.2",
     "appId": "com.ariadne.agent",
-    "productName": "Ariadne",
+    "productName": "Prime Hermes",
     "executableName": "Ariadne",
     "protocols": [
       {
