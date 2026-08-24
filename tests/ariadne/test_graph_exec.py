@@ -343,3 +343,57 @@ class TestToolSurface:
     def test_unknown_action_message(self):
         out = json.loads(handle_ariadne_plan({"action": "yolo"}))
         assert out["ok"] is False and "valid" in out["error"].lower()
+
+
+# ── prime kind + policy tiers (Phase 7) ──────────────────────────────────
+class TestPrimeKind:
+    def test_plan_accepts_prime_kind(self, store):
+        pid = _mk(store, [{"id": "think", "kind": "prime",
+                           "payload": {"prompt": "outline X"}}])
+        t = store.plan(pid)["tasks"][0]
+        assert t["kind"] == "prime"
+
+    def test_prime_artifact_flows_downstream(self, store, monkeypatch):
+        from ariadne_runtime.graph_exec import GraphExecutor
+
+        pid = _mk(store, [
+            {"id": "think", "kind": "prime",
+             "payload": {"prompt": "design"}},
+            {"id": "use", "kind": "note", "depends_on": ["think"],
+             "payload": {"text": "got {{think.result}}"}},
+        ])
+
+        def fake_prime(self, payload):
+            return {"ok": True, "result": {"text": "the design"}}
+
+        monkeypatch.setattr(GraphExecutor, "_exec_prime", fake_prime)
+        summary = GraphExecutor(store, pid).run()
+        assert summary["final_state"] == "done"
+        row = {t["id"]: t for t in store.plan(pid)["tasks"]}
+        use_row = [t for t in store.plan(pid)["tasks"]
+                   if t["id"].endswith("-use")][0]
+        assert "the design" in (use_row["result"] or "")
+
+    def test_prime_failure_routes(self, store, monkeypatch):
+        from ariadne_runtime.graph_exec import GraphExecutor
+
+        pid = _mk(store, [{"id": "p", "kind": "prime",
+                           "payload": {"prompt": "x"}}])
+
+        def boom(self, payload):
+            return {"ok": False, "error": "no_key"}
+
+        monkeypatch.setattr(GraphExecutor, "_exec_prime", boom)
+        summary = GraphExecutor(store, pid).run()
+        assert summary["final_state"] == "failed"
+
+    def test_tier_changes_executor_caps(self, store):
+        from ariadne_runtime.graph_exec import GraphExecutor
+
+        pid = _mk(store, [{"id": "a", "kind": "note"}])
+        ex = GraphExecutor(store, pid, tier="unleashed")
+        assert ex._tier["name"] == "unleashed"
+        assert ex._max_iterations == 200_000
+        assert ex._cell_timeout_s == 3600.0
+        ex2 = GraphExecutor(store, pid, tier="nonsense")
+        assert ex2._tier["name"] == "governed"

@@ -43,21 +43,30 @@ class GraphExecutor:
         plan_id: str,
         *,
         max_workers: int = 4,
-        default_cell_timeout_s: float = 300.0,
+        default_cell_timeout_s: Optional[float] = None,
         poll_interval_s: float = 0.25,
+        max_iterations: Optional[int] = None,
+        tier: Optional[str] = None,
     ) -> None:
         if max_workers < 1:
             raise ValueError("max_workers must be >= 1")
+        from ariadne_runtime import policy
+
+        pol = policy.get(tier) if tier else policy.active()
         self._store = store
         self._plan_id = plan_id
         self._max_workers = max_workers
-        self._cell_timeout_s = default_cell_timeout_s
+        self._cell_timeout_s = (default_cell_timeout_s
+                                or float(pol["cell_timeout_s"]))
         self._poll_s = poll_interval_s
+        self._max_iterations = max_iterations or int(pol["max_iterations"])
+        self._tier = pol
 
     # ── public API ────────────────────────────────────────────────────────
     def run(self, *, resume: bool = False,
-            max_iterations: int = 10_000) -> Dict[str, Any]:
+            max_iterations: Optional[int] = None) -> Dict[str, Any]:
         """Execute the DAG to a terminal state. Idempotent-resumable."""
+        cap = max_iterations or self._max_iterations
         plan = self._store.plan(self._plan_id)
         if plan is None:
             return {"ok": False, "error": f"unknown plan {self._plan_id}"}
@@ -68,7 +77,7 @@ class GraphExecutor:
         iterations = 0
         with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
             while True:
-                if iterations >= max_iterations:
+                if iterations >= cap:
                     logger.warning("graph_exec: max_iterations reached")
                     break
                 iterations += 1
@@ -161,6 +170,8 @@ class GraphExecutor:
                 return self._exec_kernel(payload)
             if kind == "rlm":
                 return self._exec_rlm(payload)
+            if kind == "prime":
+                return self._exec_prime(payload)
             if kind == "tool":
                 return self._exec_tool(payload)
         except Exception as exc:
@@ -226,6 +237,42 @@ class GraphExecutor:
              "model": payload.get("model")},
         )
         return {"ok": True, "result": {"admitted": True, "handle": handle}}
+
+    def _exec_prime(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        prompt = str(payload.get("prompt") or "").strip()
+        if not prompt:
+            return {"ok": False, "error": "prime task needs payload.prompt"}
+        try:
+            from ariadne.prime_engine import get_engine
+        except RuntimeError as exc:  # disabled by config
+            return {"ok": False, "error": str(exc)}
+        try:
+            engine = get_engine()
+        except RuntimeError as exc:
+            msg = str(exc)
+            if "bundle missing" in msg:
+                return {"ok": False,
+                        "error": ("prime bundle missing — run "
+                                  "scripts/build-prime.sh")}
+            return {"ok": False, "error": msg}
+        timeout = float(payload.get("timeout_s") or self._cell_timeout_s)
+        try:
+            out = engine.prompt(prompt, timeout_s=timeout)
+        except TimeoutError:
+            return {"ok": False,
+                    "error": f"prime prompt timed out after {timeout}s"}
+        except RuntimeError as exc:
+            return {"ok": False, "error": f"prime rpc: {exc}"}
+        if not out.get("ok"):
+            err = (out.get("raw") or {}).get("error") or "prime prompt failed"
+            if isinstance(err, dict):
+                err = json.dumps(err)
+            return {"ok": False, "error": str(err)[:2000],
+                    "result": out.get("text") or None}
+        return {"ok": True, "result": {
+            "text": (out.get("text") or "")[:16_000],
+            "events": len(out.get("events") or []),
+        }}
 
     def _exec_tool(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         name = str(payload.get("tool") or "").strip()
