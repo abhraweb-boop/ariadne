@@ -123,10 +123,13 @@ class GraphExecutor:
         if states.get("running") or states.get("ready"):
             final = "running"
         elif states.get("pending"):
-            final = "blocked"  # unreachable deps that were not skippable
+            # bypassed deps satisfy readiness, so pending here means
+            # genuinely unreachable (e.g. behind a failed node not yet skipped)
+            final = "blocked"
         elif states.get("failed"):
             final = "failed"
-        elif states.get("skipped"):
+        elif states.get("skipped") or states.get("bypassed"):
+            # gated-off branches are a normal conditional outcome
             final = "partial"
         elif not p["tasks"]:
             final = "empty"
@@ -141,6 +144,8 @@ class GraphExecutor:
 
     # ── outcome application ───────────────────────────────────────────────
     def _apply_outcome(self, task_id: str, outcome: Dict[str, Any]) -> None:
+        if outcome.get("bypassed"):
+            return  # store already holds bypassed state; do not overwrite
         if outcome.get("ok"):
             self._store.mark_done(task_id, outcome.get("result"))
             return
@@ -152,8 +157,72 @@ class GraphExecutor:
         # 'failed' is terminal; next loop's cascade_skip skips descendants.
 
     # ── task execution ────────────────────────────────────────────────────
+    @staticmethod
+    def _gate_satisfied(when: Dict[str, Any],
+                        dep_results: Dict[str, Any]) -> bool:
+        """Evaluate a `when` gate against upstream task results.
+
+        Forms:
+          {"task": "<id>", "field": "<key>", "equals": V}
+          {"task": "<id>", "field": "<key>", "not_equals": V}
+          {"task": "<id>", "equals": V}            # whole-result compare
+          {"task": "<id>", "field": "<key>"}       # truthy field
+          {"task": "<id>"}                          # truthy result
+        Missing upstream/field -> False (conservative).
+        """
+        tid = str(when.get("task") or "")
+        if not tid:
+            return True  # malformed gate = no gate
+        actual = dep_results.get(tid)
+        if "field" in when:
+            actual = (actual.get(when["field"])
+                      if isinstance(actual, dict) else None)
+        if "equals" in when:
+            return actual == when["equals"]
+        if "not_equals" in when:
+            return actual != when["not_equals"]
+        return bool(actual)
+
     def _execute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         tid = task["id"]
+
+        # gate check BEFORE running: bypass without marking running
+        payload_raw = json.loads(task["payload"] or "{}")
+        when = payload_raw.get("when")
+        if isinstance(when, dict):
+            dep_ids = json.loads(task["depends_on"] or "[]")
+            dep_results: Dict[str, Any] = {}
+            for d in dep_ids:
+                row = self._store.task(d)
+                if row is None:
+                    continue
+                try:
+                    val = json.loads(row["result"]) if row["result"] else None
+                except json.JSONDecodeError:
+                    val = row["result"]
+                dep_results[d] = val
+            # gates reference deps by their SHORT spec id; scoped ids end
+            # with -<short>, so match on suffix
+            short_results = {}
+            for k, v in dep_results.items():
+                short_results[k.rsplit("-", 1)[-1]] = v
+            ref = str(when.get("task") or "")
+            lookup = short_results.get(ref, dep_results.get(ref))
+            probe = {"task": ref}
+            if "field" in when:
+                probe["field"] = when["field"]
+            if "equals" in when:
+                probe["equals"] = when["equals"]
+            elif "not_equals" in when:
+                probe["not_equals"] = when["not_equals"]
+            satisfied = GraphExecutor._gate_satisfied(
+                probe, {ref: lookup})
+            if not satisfied:
+                self._store.mark_bypassed(tid)
+                return {"ok": True, "bypassed": True,
+                        "result": {"bypassed": True,
+                                   "reason": f"gate on '{ref}' false"}}
+
         self._store.mark_running(tid)
         try:
             payload = self._resolve_payload(task)
@@ -181,9 +250,13 @@ class GraphExecutor:
         return {"ok": False, "error": f"unhandled kind {kind!r}"}
 
     def _exec_note(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        text = str(payload.get("text") or "").strip()
-        return {"ok": True,
-                "result": {"note": text[:8000]}}
+        """Note nodes carry arbitrary condition fields (e.g. `passed`)
+        into their result so downstream `when` gates can read them."""
+        result = {k: v for k, v in payload.items() if k != "when"}
+        text = str(result.pop("text", "") or "").strip()
+        if text:
+            result["note"] = text[:8000]
+        return {"ok": True, "result": result}
 
     def _resolve_payload(self, task: Dict[str, Any]) -> Dict[str, Any]:
         payload = json.loads(task["payload"] or "{}")

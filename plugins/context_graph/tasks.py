@@ -30,7 +30,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 TASK_KINDS = ("kernel", "rlm", "tool", "note", "prime")
-TASK_STATES = ("pending", "ready", "running", "done", "failed", "skipped")
+TASK_STATES = ("pending", "ready", "running", "done", "failed", "skipped",
+               "bypassed")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS plans(
@@ -231,6 +232,21 @@ class TaskStore:
             self._conn.commit()
         self._refresh_mirror(task_id)
 
+    def mark_bypassed(self, task_id: str,
+                      reason: str = "when-condition false") -> None:
+        """Gate not satisfied: skipped-for-this-run WITHOUT cascading.
+
+        Downstream tasks still run (bypassed deps count as satisfied) --
+        this is the loop/conditional primitive, distinct from failure.
+        """
+        with self._lock:
+            self._conn.execute(
+                "UPDATE tasks SET state='bypassed', error=?, finished_at=? WHERE id=?",
+                (reason[:500], time.time(), task_id),
+            )
+            self._conn.commit()
+        self._refresh_mirror(task_id)
+
     def reset_stale_running(self, plan_id: str) -> int:
         """Crash recovery: running -> pending before a resumed run."""
         with self._lock:
@@ -256,7 +272,7 @@ class TaskStore:
         return ok
 
     def ready_tasks(self, plan_id: str) -> List[Dict[str, Any]]:
-        """Tasks whose deps are all done and which are runnable now."""
+        """Tasks runnable now: deps all done OR bypassed (gate-skip is ok)."""
         tasks = {
             t["id"]: t for t in self.plan(plan_id)["tasks"]
         }
@@ -265,19 +281,24 @@ class TaskStore:
             if t["state"] != "pending" and t["state"] != "ready":
                 continue
             deps = json.loads(t["depends_on"])
-            if all(tasks[d]["state"] == "done" for d in deps):
+            if all(tasks[d]["state"] in ("done", "bypassed") for d in deps):
                 out.append(t)
         return out
 
     def cascade_skip(self, plan_id: str) -> List[str]:
-        """Skip every task transitively depending on a failed/skipped task."""
+        """Skip every task transitively depending on a failed/skipped task.
+
+        Bypassed deps do NOT trigger skipping -- bypass is a conditional,
+        not a failure.
+        """
         tasks = {t["id"]: t for t in self.plan(plan_id)["tasks"]}
         skipped: List[str] = []
         changed = True
         while changed:
             changed = False
             for t in tasks.values():
-                if t["state"] in ("done", "failed", "skipped", "running"):
+                if t["state"] in ("done", "failed", "skipped", "running",
+                                  "bypassed"):
                     continue
                 deps = json.loads(t["depends_on"])
                 bad = [d for d in deps

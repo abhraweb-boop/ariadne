@@ -397,3 +397,106 @@ class TestPrimeKind:
         assert ex._cell_timeout_s == 3600.0
         ex2 = GraphExecutor(store, pid, tier="nonsense")
         assert ex2._tier["name"] == "governed"
+
+
+# ── gate conditions + bypassed state (Phase 8) ───────────────────────────
+class TestGatesAndBypass:
+    def test_gate_true_runs(self, store):
+        from ariadne_runtime.graph_exec import GraphExecutor
+
+        pid = _mk(store, [
+            {"id": "check", "kind": "note", "payload": {"passed": True}},
+            {"id": "do", "kind": "note", "depends_on": ["check"],
+             "payload": {"when": {"task": "check", "field": "passed", "equals": True}}},
+        ])
+        summary = GraphExecutor(store, pid).run()
+        assert summary["final_state"] == "done"
+        states = {t["id"]: t["state"] for t in store.plan(pid)["tasks"]}
+        assert states[pid + "-do"] == "done"
+
+    def test_gate_false_bypasses_not_skips(self, store):
+        """Bypass ≠ fail: downstream still runs; plan can finish 'partial'."""
+        from ariadne_runtime.graph_exec import GraphExecutor
+
+        pid = _mk(store, [
+            {"id": "check", "kind": "note", "payload": {"passed": False}},
+            {"id": "do", "kind": "note", "depends_on": ["check"],
+             "payload": {"when": {"task": "check", "field": "passed", "equals": True}}},
+            {"id": "after", "kind": "note", "depends_on": ["do"]},
+        ])
+        summary = GraphExecutor(store, pid).run()
+        assert summary["final_state"] == "partial"
+        states = {t["id"]: t["state"] for t in store.plan(pid)["tasks"]}
+        assert states[pid + "-do"] == "bypassed"
+        assert states[pid + "-after"] == "done"  # bypass does NOT cascade
+
+    def test_bypassed_dep_satisfies_ready(self, store):
+        from plugins.context_graph.tasks import TaskStore
+        from pathlib import Path
+        import tempfile
+
+        tmp = Path(tempfile.mkdtemp())
+        s2 = TaskStore(tmp / "g.db")
+        try:
+            pid = s2.create_plan("t", [
+                {"id": "c", "kind": "note"},
+                {"id": "d", "kind": "note", "depends_on": ["c"]},
+            ])
+            cid = [t for t in s2.plan(pid)["tasks"]
+                   if t["id"].endswith("-c")][0]["id"]
+            did = [t for t in s2.plan(pid)["tasks"]
+                   if t["id"].endswith("-d")][0]["id"]
+            s2.mark_running(cid)
+            s2.mark_failed(cid, "x")  # terminal failed
+            s2.cascade_skip(pid)      # d -> skipped
+            # bypassed behaves differently: satisfied dep
+            s2.mark_skipped(did, "manual")
+            t = dict(s2.task(did))
+            t["state"] = "bypassed"
+            with s2._lock:
+                s2._conn.execute(
+                    "UPDATE tasks SET state='bypassed' WHERE id=?", (did,))
+                s2._conn.commit()
+            # ready_tasks treats bypassed deps as satisfied
+            fresh = s2.create_plan("t2", [
+                {"id": "x", "kind": "note"},
+                {"id": "y", "kind": "note", "depends_on": ["x"]},
+            ])
+            xid = [t for t in s2.plan(fresh)["tasks"]
+                   if t["id"].endswith("-x")][0]["id"]
+            s2.mark_running(xid)
+            s2.mark_done(xid, None)
+            # force y's dep to bypassed to prove satisfaction semantics
+            with s2._lock:
+                s2._conn.execute(
+                    "UPDATE tasks SET state='bypassed' WHERE id=?", (xid,))
+                s2._conn.commit()
+            ready = [t["id"] for t in s2.ready_tasks(fresh)]
+            assert ready  # y became ready despite dep not 'done'
+        finally:
+            s2.close()
+
+    def test_cascade_skip_ignores_bypassed(self, store):
+        pid = _mk(store, [
+            {"id": "root", "kind": "note"},
+            {"id": "mid", "kind": "note", "depends_on": ["root"],
+             "payload": {"when": {"task": "root", "field": "passed", "equals": True}}},
+            {"id": "leaf", "kind": "note", "depends_on": ["mid"]},
+        ])
+        root_id = pid + "-root"
+        mid_id = pid + "-mid"
+        leaf_id = pid + "-leaf"
+        store.mark_done(root_id, {"passed": False})
+        skipped = store.cascade_skip(pid)
+        assert mid_id not in skipped and leaf_id not in skipped
+
+    def test_summary_counts_bypassed(self, store):
+        from ariadne_runtime.graph_exec import GraphExecutor
+
+        pid = _mk(store, [
+            {"id": "check", "kind": "note", "payload": {"passed": False}},
+            {"id": "do", "kind": "note", "depends_on": ["check"],
+             "payload": {"when": {"task": "check", "field": "passed", "equals": True}}},
+        ])
+        summary = GraphExecutor(store, pid).run()
+        assert summary["states"].get("bypassed") == 1
