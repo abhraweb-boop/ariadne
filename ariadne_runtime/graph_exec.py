@@ -380,7 +380,12 @@ def _summarize_cell(cell: Dict[str, Any]) -> str:
 
 
 def _interpret_tool_result(name: str, raw: Any) -> Dict[str, Any]:
-    """Registry returns str | dict; normalize to ok/result/error outcome."""
+    """Registry returns str | dict; normalize to ok/result/error outcome.
+
+    The registry's own failure envelope is {"error": "Tool execution
+    failed: ..."} (or a bare string starting with it) — both MUST map to
+    ok=False so plans fail visibly instead of treating errors as data.
+    """
     if isinstance(raw, dict):
         text = json.dumps(raw, default=str)
         parsed: Any = raw
@@ -390,16 +395,24 @@ def _interpret_tool_result(name: str, raw: Any) -> Dict[str, Any]:
             parsed = json.loads(text)
         except (json.JSONDecodeError, ValueError):
             parsed = None
+        # bare-string error envelopes (registry tool_error() path)
+        if parsed is None and text.lstrip().startswith(
+                ("Tool execution failed", "Unknown tool", "error:",
+                 "Error:")):
+            return {"ok": False, "error": text[:4000]}
     if isinstance(parsed, dict):
         if parsed.get("error"):
-            return {"ok": False, "error": str(parsed["error"])[:4000],
-                    "result": parsed}
+            err = str(parsed["error"])
+            if not err.lower().startswith("tool execution failed"):
+                err = f"Tool execution failed: {err}"
+            return {"ok": False, "error": err[:4000], "result": parsed}
         if parsed.get("ok") is False:
             return {"ok": False,
                     "error": str(parsed.get("error") or parsed)[:4000],
                     "result": parsed}
         return {"ok": True, "result": parsed}
     lowered = text.lstrip().lower()
-    if lowered.startswith(("tool execution failed", "error")):
+    if lowered.startswith(("tool execution failed", "unknown tool",
+                           "error:", "Error:")):
         return {"ok": False, "error": text[:4000]}
     return {"ok": True, "result": text[:16_000]}

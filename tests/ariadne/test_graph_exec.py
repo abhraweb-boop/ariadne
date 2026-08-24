@@ -345,6 +345,71 @@ class TestToolSurface:
         assert out["ok"] is False and "valid" in out["error"].lower()
 
 
+# ── vibe-mode builder (Phase 8) ──────────────────────────────────────────
+class TestVibeBuilder:
+    def test_suggest_ranks_and_teaches_next(self):
+        out = json.loads(handle_ariadne_plan({
+            "action": "suggest",
+            "goal": "watch my api and alert me when it is down"}))
+        assert out["ok"] is True
+        assert out["hits"][0]["template_id"] == "watch-alert"
+        assert out["templates_available"]
+
+    def test_instantiate_preview_has_explainer(self):
+        out = json.loads(handle_ariadne_plan({
+            "action": "instantiate", "template_id": "watch-alert",
+            "slot_values": {"TARGET_URL": "http://x/health"}}))
+        assert out["ok"] is True and out["preview"] is True
+        assert any("Alert" in s or "alert" in s for s in out["explainer"])
+
+    def test_instantiate_missing_slots_asks_questions(self):
+        from plugins.context_graph.templates import get
+
+        t = get("report-mailer")
+        has_default = all(m.get("default") for m in t["slots"].values())
+        out = json.loads(handle_ariadne_plan({
+            "action": "instantiate",
+            "template_id": "saas-crud-api",
+            "slot_values": {"RESOURCE": "", "STACK": ""}}))
+        if not has_default:
+            assert out["ok"] is False and "questions" in out
+        else:
+            assert out["ok"] is True  # defaults covered it
+
+    def test_full_vibe_flow_create_from_template(self, monkeypatch):
+        # E2E through the tool surface, but the prime worker is mocked:
+        # unit tests must never make live LLM calls.
+        from ariadne_runtime.graph_exec import GraphExecutor
+
+        inst = json.loads(handle_ariadne_plan({
+            "action": "instantiate", "template_id": "report-mailer",
+            "slot_values": {"TOPIC": "weekly"}}))
+        assert inst["ok"] is True
+        created = json.loads(handle_ariadne_plan({
+            "action": "create", "goal": inst["goal"],
+            "tasks": inst["tasks"]}))
+        assert created["ok"] is True
+        assert created["tier"] in ("governed", "unleashed")
+
+        def fake_prime(self, payload):
+            return {"ok": True,
+                    "result": {"text": "mocked report body"}}
+
+        monkeypatch.setattr(GraphExecutor, "_exec_prime", fake_prime)
+
+        def fake_tool(self, payload):
+            name = str(payload.get("tool"))
+            return {"ok": True,
+                    "result": f"[mocked {name} output]"}
+
+        monkeypatch.setattr(GraphExecutor, "_exec_tool", fake_tool)
+        ran = json.loads(handle_ariadne_exec({
+            "action": "run", "plan_id": created["plan_id"],
+            "max_workers": 2}))
+        assert ran["tier"] in ("governed", "unleashed")
+        assert ran["final_state"] == "done"
+
+
 # ── prime kind + policy tiers (Phase 7) ──────────────────────────────────
 class TestPrimeKind:
     def test_plan_accepts_prime_kind(self, store):

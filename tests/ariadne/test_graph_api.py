@@ -73,3 +73,47 @@ def test_web_server_includes_router():
         "from hermes_cli.web_routers import ariadne_graph as _ariadne_graph_routes"
         in src
     )
+
+
+def test_runs_api_endpoints(monkeypatch, tmp_path):
+    """Phase 8: Runs API serves plan state from the TaskStore."""
+    import hermes_cli.web_routers.ariadne_graph as ag
+    from plugins.context_graph.tasks import TaskStore
+
+    importlib.reload(ag)
+
+    tstore = TaskStore(tmp_path / "t.db")
+    monkeypatch.setattr(ag, "_store", lambda: tstore)
+    monkeypatch.setattr(ag, "_tasks_store", lambda: tstore)
+
+    pid = tstore.create_plan("dogfood run", [
+        {"id": "a", "kind": "note"},
+        {"id": "b", "kind": "note", "depends_on": ["a"]},
+    ])
+    a_id = [t for t in tstore.plan(pid)["tasks"]
+            if t["id"].endswith("-a")][0]["id"]
+    tstore.mark_running(a_id)
+    tstore.mark_done(a_id, {"ok": 1})
+
+    client = __import__("fastapi.testclient", fromlist=["TestClient"]).TestClient(
+        __import__("fastapi").FastAPI()
+    )
+    client.app.include_router(ag.router)
+
+    r = client.get(f"/api/ariadne/graph/runs/{pid}")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["plan"]["id"] == pid
+    states = {t["id"]: t["state"] for t in body["tasks"]}
+    assert states[a_id] == "done"
+    assert any(t["state"] == "pending" for t in body["tasks"])
+    assert body["counts"]["done"] == 1
+
+    r = client.get("/api/ariadne/graph/runs")
+    assert r.status_code == 200
+    assert any(p["id"] == pid for p in r.json()["plans"])
+
+    r = client.get("/api/ariadne/graph/runs/plan-nope")
+    assert r.status_code == 404
+
+    tstore.close()

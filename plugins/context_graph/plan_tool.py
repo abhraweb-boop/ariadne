@@ -54,11 +54,13 @@ def close_store() -> None:
 PLAN_SCHEMA = {
     "name": _PLAN_TOOL,
     "description": (
-        "Create and manage executable task DAGs (graph engineering). Emit a "
-        "plan INSTEAD of executing steps one-by-one yourself: each node is a "
-        "kernel cell, rlm child, Hermes tool call, or note; edges are "
-        "dependencies. Independent nodes run in parallel. Pass upstream "
-        "outputs downstream with {{task_id.result}} references. "
+        "Create and manage executable task DAGs (graph engineering). For "
+        "vibe-mode: action=suggest matches a plain-english goal to a "
+        "template, instantiate previews it as human steps. Or emit a plan "
+        "INSTEAD of executing steps one-by-one yourself: each node is a "
+        "kernel cell, rlm child, Hermes tool call, prime worker, or note; "
+        "edges are dependencies. Independent nodes run in parallel. Pass "
+        "upstream outputs downstream with {{task_id.result}} references. "
         'EXAMPLE: {"action":"create","goal":"migrate config",'
         '"tasks":[{"id":"scan","kind":"tool","title":"list files",'
         '"payload":{"tool":"search_files","args":{"pattern":"*.yaml"}},'
@@ -71,7 +73,7 @@ PLAN_SCHEMA = {
         "properties": {
             "action": {"type": "string",
                        "enum": ["create", "get", "list", "delete",
-                                "reset_task"]},
+                                "reset_task", "suggest", "instantiate"]},
             "goal": {"type": "string"},
             "tasks": {
                 "type": "array",
@@ -133,6 +135,7 @@ def handle_ariadne_plan(args: Dict[str, Any], **_kw) -> str:
     handlers = {
         "create": _hp_create, "get": _hp_get, "list": _hp_list,
         "delete": _hp_delete, "reset_task": _hp_reset,
+        "suggest": _hp_suggest, "instantiate": _hp_instantiate,
     }
     fn = handlers.get(action)
     if fn is None:
@@ -163,12 +166,55 @@ def _hp_create(a: Dict[str, Any]) -> Dict[str, Any]:
     store = _get_store()
     plan_id = store.create_plan(goal, specs)
     p = store.plan(plan_id)
+    import ariadne_runtime.policy as policy
+
     return {
-        "ok": True, "plan_id": plan_id,
+        "ok": True, "plan_id": plan_id, "tier": policy.active()["name"],
         "tasks": [{"id": t["id"], "kind": t["kind"], "state": t["state"],
                    "depends_on": json.loads(t["depends_on"])}
                   for t in p["tasks"]],
         "next": f'ariadne_exec {{"action":"run","plan_id":"{plan_id}"}}',
+    }
+
+
+def _hp_suggest(a: Dict[str, Any]) -> Dict[str, Any]:
+    goal = str(a.get("goal") or "").strip()
+    if not goal:
+        return {"ok": False,
+                "error": ("suggest requires goal text; e.g. {\"action\":"
+                          "\"suggest\",\"goal\":\"watch my api and alert "
+                          "me if it is down\"}")}
+    from plugins.context_graph.templates import all_templates, suggest
+
+    hits = suggest(goal, limit=int(a.get("limit") or 3))
+    return {
+        "ok": True,
+        "hits": hits,
+        "next": ('pick one and call instantiate with {"template_id", '
+                 '"slot_values"} — or just answer its questions'),
+        "templates_available": [t["id"] for t in all_templates()],
+    }
+
+
+def _hp_instantiate(a: Dict[str, Any]) -> Dict[str, Any]:
+    template_id = str(a.get("template_id") or "").strip()
+    slot_values = a.get("slot_values") or a.get("values") or {}
+    from plugins.context_graph.templates import instantiate
+
+    out = instantiate(template_id, slot_values)
+    if not out.get("ok"):
+        # teaching error: surface the questions the human must answer
+        return out
+    return {
+        "ok": True,
+        "preview": True,
+        "template_id": out["template_id"],
+        "goal": out["goal"],
+        "values": out["values"],
+        "explainer": out["explainer"],
+        "tasks": out["tasks"],
+        "next": ("create this plan via action=create with these tasks, "
+                 "then ariadne_exec run"),
     }
 
 
@@ -241,8 +287,12 @@ def _he_run(a: Dict[str, Any]) -> Dict[str, Any]:
     workers = int(a.get("max_workers") or 4)
     from ariadne_runtime.graph_exec import GraphExecutor
 
-    summary = GraphExecutor(store, pid, max_workers=max(1, min(8, workers))).run(
-        resume=True)
+    tier = a.get("tier") or None
+    summary = GraphExecutor(store, pid, max_workers=max(1, min(8, workers)),
+                            tier=tier).run(resume=True)
+    import ariadne_runtime.policy as policy
+
+    summary["tier"] = policy.active()["name"]
     return summary
 
 
