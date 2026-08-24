@@ -100,7 +100,35 @@ def _handle_host_request(req_type: str, payload: Dict[str, Any]) -> Dict[str, An
         logger.info("ariadne agent_message from %s: %s",
                     cid, str(payload.get("message"))[:200])
         return {"accepted": True}
+    if req_type == "refine.status":
+        pending = 1 if _refine_requests else 0
+        return {"pending": bool(pending), "in_flight": False,
+                "queued": len(_refine_requests)}
+    if req_type == "refine.run":
+        req = {
+            "instructions": str(payload.get("instructions") or ""),
+            "scope": str(payload.get("scope") or "global"),
+            "queued_at": time.time(),
+        }
+        with _lock:
+            _refine_requests.append(req)
+        logger.info("ariadne refine queued (%s): %.80s",
+                    req["scope"], req["instructions"])
+        return {"scheduled": True, "queued": len(_refine_requests),
+                "note": ("applied at the next turn boundary by the host-side "
+                         "refine procedure (frozen-snapshot rule)")}
     raise ValueError(f"unsupported host request type: {req_type}")
+
+
+_refine_requests: list = []
+
+
+def drain_refine_requests() -> list:
+    """Host-side refine procedure pulls and clears queued requests."""
+    with _lock:
+        reqs = list(_refine_requests)
+        _refine_requests.clear()
+    return reqs
 
 
 def _admit_child(payload: Dict[str, Any]) -> Dict[str, Any]:
