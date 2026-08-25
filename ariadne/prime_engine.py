@@ -106,9 +106,20 @@ class PrimeEngine:
             proc.wait(timeout=5)
         except Exception:
             pass
-        if os.name == "nt" and proc.poll() is None:
-            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
-                           capture_output=True)
+        if os.name == "nt":
+            try:
+                if proc.poll() is None:
+                    subprocess.run(["taskkill", "/PID", str(proc.pid),
+                                    "/T", "/F"], capture_output=True)
+            except Exception:
+                pass
+        else:
+            # POSIX: terminate() should suffice; ensure no stragglers
+            try:
+                subprocess.run(["pkill", "-9", "-P", str(proc.pid)],
+                               capture_output=True)
+            except Exception:
+                pass
         with self._lock:
             waiters = list(self._pending.items())
             self._pending.clear()
