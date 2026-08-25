@@ -92,6 +92,9 @@ PLAN_SCHEMA = {
                                     "description": ("kernel:{code,timeout_s} "
                                                     "rlm:{prompt,name,model} "
                                                     "tool:{tool,args} "
+                                                    "prime:{prompt} "
+                                                    "scout:{technologies,"
+                                                    "goal_hint} "
                                                     "note:{text}")},
                         "max_attempts": {"type": "integer",
                                          "minimum": 1, "maximum": 5},

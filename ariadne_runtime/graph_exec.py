@@ -23,9 +23,12 @@ its own outputs -- never past conversation context.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import re
 import threading
+import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from typing import Any, Dict, List, Optional
 
@@ -241,6 +244,8 @@ class GraphExecutor:
                 return self._exec_rlm(payload)
             if kind == "prime":
                 return self._exec_prime(payload)
+            if kind == "scout":
+                return self._exec_scout(payload)
             if kind == "tool":
                 return self._exec_tool(payload)
         except Exception as exc:
@@ -346,6 +351,111 @@ class GraphExecutor:
             "text": (out.get("text") or "")[:16_000],
             "events": len(out.get("events") or []),
         }}
+
+    def _exec_scout(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Ground a technology set against the live web (P10-D).
+
+        For each technology: official-docs search + top GitHub reference
+        projects, distilled into a grounding card. Results cached in the
+        memory ledger keyed by sorted-tech hash so identical rebuilds
+        fetch nothing. Batched serially (≤1 concurrent) to respect
+        provider rate limits.
+        """
+        techs = [str(t).strip() for t in (payload.get("technologies") or [])
+                 if str(t).strip()]
+        goal_hint = str(payload.get("goal_hint") or "").strip()
+        if not techs:
+            return {"ok": False,
+                    "error": "scout task needs payload.technologies"}
+        key = "scout:" + hashlib.sha256(
+            json.dumps({"t": sorted(x.lower() for x in techs),
+                        "g": goal_hint}).encode()).hexdigest()[:16]
+
+        # 1) cache lookup (memory ledger via ariadne_memory store)
+        try:
+            from plugins.memory.ariadne import ledger
+
+            cached = ledger.get_by_key(key) if hasattr(ledger, "get_by_key") \
+                else None
+        except Exception:
+            cached = None
+        if cached:
+            return {"ok": True, "result": dict(cached, cached=True)}
+
+        cards = []
+        for tech in techs:
+            card = self._scout_one(tech, goal_hint)
+            cards.append(card)
+        result = {
+            "technologies": techs,
+            "cards": cards,
+            "reference_projects": [p for c in cards
+                                   for p in c.get("projects", [])][:8],
+            "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        }
+        # 2) cache write-through (best-effort)
+        try:
+            from plugins.memory.ariadne import ledger
+
+            if hasattr(ledger, "put_with_key"):
+                ledger.put_with_key(key, result)
+        except Exception:
+            pass
+        return {"ok": True, "result": result}
+
+    def _scout_one(self, tech: str, goal_hint: str) -> Dict[str, Any]:
+        """One technology -> {tech, api_facts[], projects[]}."""
+        from tools.registry import registry
+
+        def _search(query: str) -> str:
+            raw = registry.dispatch("web_search",
+                                    {"query": query, "limit": 4})
+            out = _interpret_tool_result("web_search", raw)
+            return json.dumps(out.get("result", ""))[:4000] if out["ok"] \
+                else f"unavailable: {out.get('error', '')[:120]}"
+
+        docs_q = f"{tech} official documentation getting started"
+        gh_q = f"github.com {tech}" + (f" {goal_hint}" if goal_hint else "")
+        docs_raw = _search(docs_q)
+        gh_raw = _search(gh_q)
+
+        def _extract_urls(blob: str, want: str) -> List[str]:
+            urls = re.findall(r"https?://[^\s\"'\\<>]+", blob)
+            picked = []
+            for u in urls:
+                low = u.lower()
+                if want == "docs" and ("docs" in low or "readthedocs" in low):
+                    picked.append(u)
+                elif want == "gh" and "github.com" in low:
+                    picked.append(u)
+            seen, uniq = set(), []
+            for u in picked:
+                base = u.rstrip("/").split("?")[0]
+                if base not in seen and len(base) > 24:
+                    seen.add(base)
+                    uniq.append(base)
+            return uniq
+
+        docs_hits = _extract_urls(docs_raw + gh_raw, "docs")
+        gh_hits = _extract_urls(gh_raw, "gh")
+        unavailable = docs_raw.startswith("unavailable:") and \
+            gh_raw.startswith("unavailable:")
+
+        projects = [{"name": u.split("/")[-1], "url": u}
+                    for u in gh_hits[:3]]
+        card = {
+            "tech": tech,
+            "api_facts": ([f"docs: {u}" for u in docs_hits[:3]]
+                          or ([f"search unavailable ({goal_hint or 'no hint'})"]
+                              if unavailable else [])),
+            "projects": projects,
+            "note_unverified": bool(unavailable),
+        }
+        if unavailable:
+            card["warning"] = ("web_search backend unreachable — this "
+                               "technology is UNVERIFIED; do not invent "
+                               "APIs for it")
+        return card
 
     def _exec_tool(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         name = str(payload.get("tool") or "").strip()
