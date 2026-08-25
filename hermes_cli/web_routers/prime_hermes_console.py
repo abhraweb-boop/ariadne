@@ -166,6 +166,14 @@ def console_new_session() -> Dict[str, Any]:
     return {"ok": bool(res.get("success"))}
 
 
+@router.get("/heals")
+def console_heals(limit: int = 25) -> Dict[str, Any]:
+    """Autonomous-heal journal: what the doctor fixed without asking."""
+    from ariadne_runtime.doctor import get_heals
+
+    return {"ok": True, "heals": get_heals(limit)}
+
+
 @router.post("/exec/{plan_id}")
 def console_exec(plan_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
     """Run a plan from the Console (P14-aware: tier + budget gate)."""
@@ -359,6 +367,7 @@ const HELP = [
   "/status        — refresh engine/model/tier badges",
   "/session       — start a new prime session",
   "/steer <text>  — steer a running prompt",
+  "/heals         — what the doctor fixed autonomously",
   "/help          — this list",
   "anything else is sent to the prime engine as a prompt."
 ].join("\\n");
@@ -372,6 +381,14 @@ document.getElementById("f").addEventListener("submit", async (ev) => {
   if (text === "/help") return line(HELP, "sys");
   if (text === "/status") return refreshStatus();
   if (text === "/session") return act("/new_session");
+  if (text === "/heals") {
+    return fetch("heals").then(r => r.json()).then(d => {
+      if (!d.heals.length) return line("no heals yet — nothing needed fixing", "sys");
+      for (const h of d.heals)
+        line(`[${h.at}] ${h.task || "-"} · ${h.note}` +
+             (h.action ? ` → ${h.action}` : ""), "sys");
+    }).catch(() => line("heals unavailable", "err"));
+  }
   if (text.startsWith("/steer ")) {
     const msg = text.slice(7).trim();
     if (msg) return act("/steer", {text: msg});

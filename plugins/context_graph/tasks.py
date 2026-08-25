@@ -60,6 +60,10 @@ CREATE TABLE IF NOT EXISTS tasks(
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_plan ON tasks(plan_id);
 CREATE INDEX IF NOT EXISTS idx_plans_state ON plans(state);
+CREATE TABLE IF NOT EXISTS plan_context(
+    plan_id TEXT PRIMARY KEY REFERENCES plans(id),
+    data TEXT NOT NULL DEFAULT '{}'
+);
 """
 
 _SLUG_RE = re.compile(r"[^a-z0-9_-]+")
@@ -296,6 +300,25 @@ class TaskStore:
         except Exception:
             pass
         return t["id"]
+
+    def set_plan_context(self, plan_id: str, data: Dict[str, Any]) -> None:
+        """Store per-plan execution context (e.g. {"secret_scan": "strict"})."""
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO plan_context(plan_id, data) VALUES(?, ?) "
+                "ON CONFLICT(plan_id) DO UPDATE SET data=excluded.data",
+                (plan_id, json.dumps(data or {}, default=str)))
+            self._conn.commit()
+
+    def get_plan_context(self, plan_id: str) -> Dict[str, Any]:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT data FROM plan_context WHERE plan_id=?",
+                (plan_id,)).fetchone()
+        try:
+            return json.loads(row["data"]) if row else {}
+        except Exception:
+            return {}
 
     def rename_task(self, task_id: str, title: str) -> None:
         """In-place title update -- never triggers a rebuild."""

@@ -127,6 +127,10 @@ class ErrorDoctor:
     def _log(self, entry: Dict[str, Any]) -> None:
         entry["at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
         self.journal.append(entry)
+        try:
+            journal_heal(dict(entry))
+        except Exception:
+            pass
         if self._on_event:
             try:
                 self._on_event(entry["note"])
@@ -245,6 +249,24 @@ class BudgetGovernor:
 
 # ── process-wide governor (Console reads this) ────────────────────────────
 _active_governor: Optional["BudgetGovernor"] = None
+
+# process-wide heal journal (survives across doctor instances in one proc)
+_HEAL_JOURNAL: List[Dict[str, Any]] = []
+_JOURNAL_CAP = 200
+
+
+def journal_heal(entry: Dict[str, Any]) -> None:
+    """Append a heal event to the process-wide journal (capped, newest
+    last). Called by ErrorDoctor._log and by graph_exec drift/heal paths."""
+    entry.setdefault("at", time.strftime("%Y-%m-%dT%H:%M:%S"))
+    _HEAL_JOURNAL.append(entry)
+    if len(_HEAL_JOURNAL) > _JOURNAL_CAP:
+        del _HEAL_JOURNAL[: len(_HEAL_JOURNAL) - _JOURNAL_CAP]
+
+
+def get_heals(limit: int = 50) -> List[Dict[str, Any]]:
+    """Newest-first view of autonomous heals for the /heals surface."""
+    return list(reversed(_HEAL_JOURNAL))[:max(1, min(200, limit))]
 
 
 def get_budget() -> "BudgetGovernor":

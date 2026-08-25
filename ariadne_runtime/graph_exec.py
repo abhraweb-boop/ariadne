@@ -213,6 +213,14 @@ class GraphExecutor:
         if not hasattr(self, "_drift_notes"):
             self._drift_notes = {}
         self._drift_notes[task["id"]] = reason
+        try:
+            from ariadne_runtime.doctor import journal_heal
+
+            journal_heal({"task": task["id"], "kind": "drift",
+                          "note": f"flagged DRIFT: {reason[:160]}",
+                          "action": "retry with [REFOCUS] preamble"})
+        except Exception:
+            pass
         logger.warning("graph_exec: %s flagged DRIFT (%s)",
                        task.get("id"), reason[:120])
         return {"ok": False,
@@ -304,6 +312,23 @@ class GraphExecutor:
         kind = task["kind"]
         if kind not in TASK_KINDS:
             return {"ok": False, "error": f"unknown kind {kind!r}"}
+        # P14 secret-scan gate: advisory by default, strict via plan context
+        try:
+            ctx = self._store.get_plan_context(self._plan_id)
+            if ctx.get("secret_scan") == "strict":
+                from ariadne_runtime.secret_scan import scan_task_payload
+
+                findings = scan_task_payload(payload)
+                if findings:
+                    labels = ", ".join(sorted({f["label"]
+                                               for f in findings}))
+                    return {"ok": False,
+                            "error": ("secret-scan (strict): credential-"
+                                      f"shaped strings in payload "
+                                      f"[{labels}]; move secrets to env "
+                                      "references")}
+        except Exception:
+            pass  # the gate must never break execution
         outcome = None
         try:
             if kind == "note":
