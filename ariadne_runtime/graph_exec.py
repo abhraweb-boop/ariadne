@@ -246,6 +246,10 @@ class GraphExecutor:
                 return self._exec_prime(payload)
             if kind == "scout":
                 return self._exec_scout(payload)
+            if kind == "gemini":
+                return self._exec_gemini(payload)
+            if kind == "flo":
+                return self._exec_flo(payload)
             if kind == "tool":
                 return self._exec_tool(payload)
         except Exception as exc:
@@ -456,6 +460,47 @@ class GraphExecutor:
                                "technology is UNVERIFIED; do not invent "
                                "APIs for it")
         return card
+
+    def _exec_gemini(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Gemini node (P13): in-process google-genai call."""
+        from ariadne_runtime import google_provider as gp
+
+        prompt = str(payload.get("prompt") or "").strip()
+        if not prompt:
+            return {"ok": False, "error": "gemini task needs payload.prompt"}
+        res = gp.generate(prompt, model=payload.get("model") or None,
+                          system=payload.get("system") or None,
+                          timeout_s=self._cell_timeout_s or 120.0)
+        if not res.get("ok"):
+            # teaching states pass through as errors (no_key etc.)
+            err = str(res.get("error"))
+            hint = res.get("hint", "")
+            return {"ok": False,
+                    "error": f"gemini: {err}" + (f" — {hint}" if hint else "")}
+        return {"ok": True, "result": {"text": res["text"],
+                                       "model": res.get("model"),
+                                       "usage": res.get("usage", {})}}
+
+    def _exec_flo(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """ruflo swarm node (P13): vendored CLI, adapter seam."""
+        from ariadne_runtime.flo_engine import FloEngine
+
+        objective = str(payload.get("objective")
+                        or payload.get("prompt") or "").strip()
+        if not objective:
+            return {"ok": False,
+                    "error": "flo task needs payload.objective"}
+        eng = FloEngine()
+        res = eng.run_swarm(objective,
+                            timeout_s=float(self._cell_timeout_s or 600.0))
+        if not res.get("ok"):
+            err = str(res.get("error"))
+            hint = res.get("hint", "")
+            return {"ok": False,
+                    "error": f"flo: {err}" + (f" — {hint}" if hint else "")}
+        return {"ok": True,
+                "result": {"stdout": res.get("stdout", ""),
+                           "returncode": res.get("returncode", 0)}}
 
     def _exec_tool(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         name = str(payload.get("tool") or "").strip()

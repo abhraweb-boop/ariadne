@@ -29,7 +29,8 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-TASK_KINDS = ("kernel", "rlm", "tool", "note", "prime", "scout")
+TASK_KINDS = ("kernel", "rlm", "tool", "note", "prime", "scout",
+              "gemini", "flo")
 TASK_STATES = ("pending", "ready", "running", "done", "failed", "skipped",
                "bypassed")
 
