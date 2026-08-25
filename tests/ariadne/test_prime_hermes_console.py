@@ -91,6 +91,25 @@ def test_steer_and_new_session(api):
     assert pc.console_new_session()["ok"] is True
 
 
+def test_exec_endpoint_runs_plan(monkeypatch, tmp_path):
+    from ariadne_runtime.graph_exec import GraphExecutor
+    from plugins.context_graph.tasks import TaskStore
+    from hermes_cli.web_routers import prime_hermes_console as pc
+    from plugins.context_graph import plan_tool as pt
+
+    tstore = TaskStore(tmp_path / "t.db")
+    pid = tstore.create_plan("console exec", [
+        {"id": "a", "kind": "note"},
+        {"id": "b", "kind": "note", "depends_on": ["a"]},
+    ])
+
+    monkeypatch.setattr(pt, "_get_store", lambda: tstore)
+    out = pc.console_exec(pid, {})
+    assert out["ok"] is True
+    assert out["summary"]["final_state"] == "done"
+    tstore.close()
+
+
 def test_page_contains_branding(api):
     pc, _ = api
     html = pc.console_page().body.decode("utf-8")

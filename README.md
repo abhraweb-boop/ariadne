@@ -1,46 +1,38 @@
 # Prime Hermes
 
-**A persistent-memory, graph-engineered build agent** — a fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) (formerly **Ariadne**) that plans work as executable task graphs and remembers its own conclusions.
+**A graph-engineered build agent for vibe coders** — a fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) (formerly **Ariadne**) where you describe what you want in plain English, answer a few explained questions, and an executable task graph builds it — grounded, self-healing, and impossible to lie to you.
 
-Where stock Hermes treats every session as fresh context, Prime Hermes layers a research loop on top:
+## What makes it different
 
-- **Persistent IPython kernel** — long-lived kernel sessions managed via `ariadne/kernel_manager.py`, so exploration survives across turns instead of dying with each tool call.
-- **Recursive `rlm()`** — subagent lifecycle service (`ariadne/service.py`) for spawning scoped child workers whose results flow back into the parent thread.
-- **`/refine` memory ledger** — `ariadne_runtime/refine.py` writes every refinement into a SQLite ledger at 10× retention granularity; conclusions compound instead of evaporating.
-- **Context graph + waterfall loader** — `plugins/context_graph/` builds a live graph of session entities/artifacts and loads relevant context waterfall-style (nearest-first), surfaced in the desktop app's `/graph` panel.
-- **Graph execution (Phase 6)** — plans are executable task DAGs (`ariadne_plan` / `ariadne_exec`): the executor walks topological order with parallel branches, `{{task.result}}` artifact passing, per-task retries, and cascade-skip failure routing — the graph *is* the loop, not just its memory. See [`docs/architecture-ariadne-phase6.md`](docs/architecture-ariadne-phase6.md).
-- **Prime engine** — vendored [prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) driven over RPC as a `prime` DAG kind / `ariadne_prime` tool; autonomy tiers `governed | unleashed`.
-- **Packaged desktop app** — rebranded Electron build (**Prime Hermes**) with installers under `apps/desktop/release/`.
+- **The graph is the loop.** Plans are executable DAGs: kernel cells, prime workers, Gemini calls, ruflo swarms, tool invocations, and condition notes — wired by dependencies, run with parallel branches, retries, and gate conditions (`when` → bypass, not failure).
+- **Prime engine inside.** Vendored [prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) over RPC as a first-class worker; autonomy tiers `governed | unleashed` (unleashed = 5 attempts, hour-long cells, auto-steer). Hard floors never move: no credential entry, no payment UI.
+- **Guided Build Mode.** `ariadne_guide` walks non-coders through milestones with MCQs where every option carries its impact; say "you decide" and it chooses transparently (`/why` replays the reasoning); failures become recovery choices (retry / change approach / skip).
+- **Self-modifying graphs.** `patch_plan` diffs your edits against the running plan by content hash: finished work survives untouched, only the changed branch (and its dependents) resets.
+- **Grounded builds.** `scout` nodes fetch official docs + reference projects per technology before code is written; unverified tech is stamped UNVERIFIED, never invented.
+- **Anti-slop scoring.** Skill candidates compete on a transparent rubric (overlaps rejected); inspiration projects are graded authority/craft/recency/fit — craft beats stars, slop is dropped.
+- **Visible rebuilds.** Changes are physical: files are archived, erased, rebuilt, and proven with byte-level diff bundles. A bare "done ✓" without proof is structurally rejected; identical output reports honest `noop`.
+- **Self-healing + budget leash.** Every failure is classified (transient/environmental/logical/permanent) into automatic playbooks — only true permanents reach a human. Unleashed runs carry a spending cap that warns at 50% and pauses at the limit.
+- **Google SDK + ruflo inside.** In-process Gemini provider and vendored ruflo swarms as ordinary node kinds behind clean adapter seams.
 
-## Status
-
-**Alpha.** Windows x64 installer is provided; macOS/Linux builds are not yet produced. Expect rough edges — this is a research line, not a stable product.
-
-## Install (Windows)
-
-Download `Ariadne-0.17.0-win-x64.exe` from [Releases](../../releases) and run it.
-
-## Running from source
+## Try it
 
 ```bash
 git clone https://github.com/abhraweb-boop/ariadne.git
 cd ariadne
-uv sync                      # Python deps
-cd apps/desktop && npm ci && npm run dev   # desktop shell
+uv sync --extra dev --extra ariadne
+scripts/build-prime.sh          # build the vendored prime engine
+
+# run the dashboard server, then:
+#   /api/prime-hermes/console/   ← text console (slash commands)
+#   /api/ariadne/graph/flow      ← live Flow view of running plans
 ```
 
-The agent core, CLI, skills, and plugin system are unchanged from upstream — see [`HERMES-README.md`](HERMES-README.md) for full documentation of the underlying platform, including `hermes setup`, providers, gateway platforms, and plugin authoring.
+Tool surface: `ariadne_plan` (create/suggest/instantiate), `ariadne_exec` (run),
+`ariadne_guide` (start/answer/decide/why), `ariadne_prime`, plus the kernel/rlm tools.
 
-## Layout (Prime Hermes-specific)
+## Status
 
-```
-ariadne/                  kernel manager + rlm() subagent service
-ariadne_runtime/          bridge + /refine ledger runtime
-plugins/context_graph/    context-graph store + waterfall loader
-plugins/memory/ariadne/   ledger persistence hooks
-apps/desktop/             Electron app (rebranded "Ariadne")
-```
+**Alpha, feature-complete against its design brief.** Windows x64 is primary;
+macOS/Linux not yet packaged. CI runs the hermetic test suite on every push.
 
-## License
-
-MIT — inherited from Hermes Agent, © Nous Research (see [`LICENSE`](LICENSE)). Ariadne-specific changes © their authors.
+Built on [Hermes Agent](https://github.com/NousResearch/hermes-agent) — see [`HERMES-README.md`](HERMES-README.md) for the underlying platform. MIT. Prime engine © Mario Zechner, MIT · ruflo © ruvnet, MIT.

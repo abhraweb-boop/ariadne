@@ -166,6 +166,46 @@ def console_new_session() -> Dict[str, Any]:
     return {"ok": bool(res.get("success"))}
 
 
+@router.post("/exec/{plan_id}")
+def console_exec(plan_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    """Run a plan from the Console (P14-aware: tier + budget gate)."""
+    try:
+        from ariadne_runtime.doctor import get_budget
+
+        gov = get_budget()
+        gate = gov.gate()
+        if not gate["allowed"]:
+            return {"ok": False, "paused": True,
+                    "reason": ("budget cap reached — raise the cap or "
+                               "resume before running more")}
+    except Exception:
+        gov = None
+    try:
+        from plugins.context_graph.plan_tool import _get_store
+        from ariadne_runtime.graph_exec import GraphExecutor
+
+        store = _get_store()
+        if store.plan(plan_id) is None:
+            raise HTTPException(status_code=404,
+                                detail=f"unknown plan {plan_id}")
+        tier = (body or {}).get("tier") or None
+        summary = GraphExecutor(store, plan_id, tier=tier).run(resume=True)
+        try:
+            import json as _json
+
+            est = float((summary.pop("_est_cost_usd", None) or 0))
+        except Exception:
+            est = 0.0
+        if gov is not None and est:
+            rec = gov.record(est)
+            summary["budget"] = rec
+        return {"ok": bool(summary.get("ok")), "summary": summary}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 # ── the Console surface ───────────────────────────────────────────────────
 _CONSOLE_HTML = """<!DOCTYPE html>
 <html lang="en">
