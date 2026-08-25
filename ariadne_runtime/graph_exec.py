@@ -64,6 +64,8 @@ class GraphExecutor:
         self._poll_s = poll_interval_s
         self._max_iterations = max_iterations or int(pol["max_iterations"])
         self._tier = pol
+        # P15: task_id -> drift reason (drives refocus preambles on retries)
+        self._drift_notes: Dict[str, str] = {}
 
     # ── public API ────────────────────────────────────────────────────────
     def run(self, *, resume: bool = False,
@@ -153,6 +155,14 @@ class GraphExecutor:
             self._store.mark_done(task_id, outcome.get("result"))
             return
         err = str(outcome.get("error") or "unknown error")
+        # P15: drift failures are retryable BY DESIGN (refocused attempt
+        # follows) -- check before the doctor's conservative classifier
+        if err.startswith("drift:"):
+            new_state = self._store.mark_failed(task_id, err)
+            if new_state == "ready":
+                logger.info("graph_exec: %s drifted, refocusing (%s)",
+                            task_id, err[:120])
+            return
         # P14 self-healing: classify; only permanent errors skip retries
         try:
             from ariadne_runtime.doctor import classify
@@ -171,6 +181,43 @@ class GraphExecutor:
                         task_id, err[:120])
 
     # ── task execution ────────────────────────────────────────────────────
+    def _drift_check(self, task: Dict[str, Any],
+                     outcome: Dict[str, Any]) -> Dict[str, Any]:
+        """P15 drift sentinel: judge prime/gemini outputs against the goal.
+
+        DRIFT verdict -> outcome becomes a failure whose retry carries a
+        refocus preamble. Silent no-op when judging unavailable/opted-out.
+        """
+        kind = task.get("kind")
+        if kind not in ("prime", "gemini"):
+            return outcome
+        payload_raw = json.loads(task.get("payload") or "{}")
+        if payload_raw.get("judge") is False:
+            return outcome
+        if not outcome.get("ok"):
+            return outcome
+        try:
+            from ariadne_runtime.goal_anchor import judge_output
+
+            result = outcome.get("result") or {}
+            text = (result.get("text") or result.get("stdout")
+                    or json.dumps(result, default=str))
+            reason = judge_output(self._plan_goal(),
+                                  str(task.get("title") or ""),
+                                  str(text))
+        except Exception:
+            return outcome  # never let the judge break execution
+        if not reason:
+            return outcome
+        # remember the drift so the retry (if any) gets a refocus preamble
+        if not hasattr(self, "_drift_notes"):
+            self._drift_notes = {}
+        self._drift_notes[task["id"]] = reason
+        logger.warning("graph_exec: %s flagged DRIFT (%s)",
+                       task.get("id"), reason[:120])
+        return {"ok": False,
+                "error": f"drift: {reason}"}
+
     @staticmethod
     def _gate_satisfied(when: Dict[str, Any],
                         dep_results: Dict[str, Any]) -> bool:
@@ -243,31 +290,47 @@ class GraphExecutor:
         except Exception as exc:
             return {"ok": False,
                     "error": f"payload resolution: {type(exc).__name__}: {exc}"}
+        # P15: re-attach drift note on retries so prime re-runs get refocused
+        if tid in getattr(self, "_drift_notes", {}):
+            try:
+                row = self._store.task(tid)
+                if int((row or {}).get("attempts") or 0) >= 1:
+                    payload["_refocus"] = (
+                        f"Previous attempt drifted from the milestone: "
+                        f"{self._drift_notes[tid]}. Redo ONLY this "
+                        f"milestone's job; discard unrelated work.")
+            except Exception:
+                pass
         kind = task["kind"]
         if kind not in TASK_KINDS:
             return {"ok": False, "error": f"unknown kind {kind!r}"}
+        outcome = None
         try:
             if kind == "note":
-                return self._exec_note(payload)
-            if kind == "kernel":
-                return self._exec_kernel(payload)
-            if kind == "rlm":
-                return self._exec_rlm(payload)
-            if kind == "prime":
-                return self._exec_prime(payload)
-            if kind == "scout":
-                return self._exec_scout(payload)
-            if kind == "gemini":
-                return self._exec_gemini(payload)
-            if kind == "flo":
-                return self._exec_flo(payload)
-            if kind == "tool":
-                return self._exec_tool(payload)
+                outcome = self._exec_note(payload)
+            elif kind == "kernel":
+                outcome = self._exec_kernel(payload)
+            elif kind == "rlm":
+                outcome = self._exec_rlm(payload)
+            elif kind == "prime":
+                outcome = self._exec_prime(payload)
+            elif kind == "scout":
+                outcome = self._exec_scout(payload)
+            elif kind == "gemini":
+                outcome = self._exec_gemini(payload)
+            elif kind == "flo":
+                outcome = self._exec_flo(payload)
+            elif kind == "tool":
+                outcome = self._exec_tool(payload)
         except Exception as exc:
             logger.exception("graph_exec task %s raised", tid)
+            outcome = None
             return {"ok": False,
                     "error": f"{type(exc).__name__}: {exc}"}
-        return {"ok": False, "error": f"unhandled kind {kind!r}"}
+        if not isinstance(outcome, dict):
+            return {"ok": False, "error": f"unhandled kind {kind!r}"}
+        # P15 drift sentinel (prime/gemini only, judge opt-out honored)
+        return self._drift_check(task, outcome)
 
     def _exec_note(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Note nodes carry arbitrary condition fields (e.g. `passed`)
@@ -283,6 +346,8 @@ class GraphExecutor:
         dep_ids = json.loads(task["depends_on"] or "[]")
         if not dep_ids:
             return payload
+        from ariadne_runtime.goal_anchor import cap_artifact
+
         results = {}
         for d in dep_ids:
             row = self._store.task(d)
@@ -292,6 +357,15 @@ class GraphExecutor:
                 results[d] = json.loads(row["result"]) if row["result"] else None
             except json.JSONDecodeError:
                 results[d] = row["result"]
+            # context-pack discipline: cap oversized artifacts so long chains
+            # can't drown the goal (P15). Small structured values stay native.
+            v = results[d]
+            if isinstance(v, str):
+                if len(v) > 2048:
+                    results[d] = cap_artifact(v, limit=2048)
+            elif isinstance(v, (dict, list)):
+                if len(json.dumps(v, default=str)) > 2048:
+                    results[d] = cap_artifact(v, limit=2048)
         return TaskStore.resolve_refs(payload, results)
 
     def _exec_kernel(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -331,10 +405,24 @@ class GraphExecutor:
         )
         return {"ok": True, "result": {"admitted": True, "handle": handle}}
 
+    def _plan_goal(self) -> str:
+        """Best-effort plan goal for anchoring (empty when unavailable)."""
+        try:
+            p = self._store.plan(self._plan_id)
+            return str((p or {}).get("goal") or "")
+        except Exception:
+            return ""
+
     def _exec_prime(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         prompt = str(payload.get("prompt") or "").strip()
         if not prompt:
             return {"ok": False, "error": "prime task needs payload.prompt"}
+        from ariadne_runtime.goal_anchor import build_anchor
+
+        prompt = build_anchor(
+            self._plan_goal(),
+            str(payload.get("title") or payload.get("_title") or "")) \
+            + "\n\n" + prompt
         try:
             from ariadne.prime_engine import get_engine
         except RuntimeError as exc:  # disabled by config
@@ -349,6 +437,10 @@ class GraphExecutor:
                                   "scripts/build-prime.sh")}
             return {"ok": False, "error": msg}
         timeout = float(payload.get("timeout_s") or self._cell_timeout_s)
+        # P15: on a drift-retry (attempt >= 2) prepend the refocus preamble
+        refocus = payload.get("_refocus")
+        if refocus:
+            prompt = f"[REFOCUS] {refocus}\n\n{prompt}"
         try:
             out = engine.prompt(prompt, timeout_s=timeout)
         except TimeoutError:
@@ -479,6 +571,12 @@ class GraphExecutor:
         prompt = str(payload.get("prompt") or "").strip()
         if not prompt:
             return {"ok": False, "error": "gemini task needs payload.prompt"}
+        from ariadne_runtime.goal_anchor import build_anchor
+
+        prompt = build_anchor(
+            self._plan_goal(),
+            str(payload.get("title") or payload.get("_title") or "")) \
+            + "\n\n" + prompt
         res = gp.generate(prompt, model=payload.get("model") or None,
                           system=payload.get("system") or None,
                           timeout_s=self._cell_timeout_s or 120.0)
@@ -501,6 +599,12 @@ class GraphExecutor:
         if not objective:
             return {"ok": False,
                     "error": "flo task needs payload.objective"}
+        from ariadne_runtime.goal_anchor import build_anchor
+
+        objective = build_anchor(
+            self._plan_goal(),
+            str(payload.get("title") or payload.get("_title") or "")) \
+            + "\n\n" + objective
         eng = FloEngine()
         res = eng.run_swarm(objective,
                             timeout_s=float(self._cell_timeout_s or 600.0))
