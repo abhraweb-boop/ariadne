@@ -196,8 +196,30 @@ def console_exec(plan_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
         if store.plan(plan_id) is None:
             raise HTTPException(status_code=404,
                                 detail=f"unknown plan {plan_id}")
+        # P14 git-backed builds: optional before/after checkpoints
+        snap_dir = (body or {}).get("snapshot_dir")
+        before_sha = None
+        if snap_dir:
+            from ariadne_runtime import build_snapshots as bsp
+
+            before_sha = bsp.snapshot(snap_dir, f"before {plan_id}")
         tier = (body or {}).get("tier") or None
         summary = GraphExecutor(store, plan_id, tier=tier).run(resume=True)
+        if snap_dir:
+            try:
+                after_sha = bsp.snapshot(
+                    snap_dir,
+                    f"after {plan_id} ({summary.get('final_state')})")
+                bsp.record_run(
+                    snap_dir, plan_id, before_sha, after_sha,
+                    str(summary.get("final_state") or "?"),
+                    extra={"goal": (store.plan(plan_id) or {})
+                           .get("goal", "")})
+                summary["snapshot"] = {"dir": str(snap_dir),
+                                       "before": before_sha,
+                                       "after": after_sha}
+            except Exception:
+                pass  # snapshots must never fail a run
         try:
             import json as _json
 
@@ -368,6 +390,7 @@ const HELP = [
   "/session       — start a new prime session",
   "/steer <text>  — steer a running prompt",
   "/heals         — what the doctor fixed autonomously",
+  "/tour          — 30-second guided walkthrough",
   "/help          — this list",
   "anything else is sent to the prime engine as a prompt."
 ].join("\\n");
@@ -388,6 +411,16 @@ document.getElementById("f").addEventListener("submit", async (ev) => {
         line(`[${h.at}] ${h.task || "-"} · ${h.note}` +
              (h.action ? ` → ${h.action}` : ""), "sys");
     }).catch(() => line("heals unavailable", "err"));
+  }
+  if (text === "/tour") {
+    const steps = [
+      ["1/5", "This console talks straight to the Prime engine. Anything you type becomes a prompt."],
+      ["2/5", "Badges up top show model · tier · engine state · gemini/flo availability · budget spent."],
+      ["3/5", "Plans are executable graphs. Runs appear in /flow with live per-node states; exec them via POST /exec/{plan_id}."],
+      ["4/5", "The doctor fixes failures autonomously — type /heals to see exactly what it did without asking."],
+      ["5/5", "Every run can be checkpointed in git (.prime-runs/<plan>.json holds before/after SHAs) and reverted safely."]];
+    steps.forEach(([n, s], i) => setTimeout(() => line(`${n}  ${s}`, "sys"), i * 350));
+    return;
   }
   if (text.startsWith("/steer ")) {
     const msg = text.slice(7).trim();
