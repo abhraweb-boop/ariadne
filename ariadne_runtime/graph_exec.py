@@ -153,11 +153,22 @@ class GraphExecutor:
             self._store.mark_done(task_id, outcome.get("result"))
             return
         err = str(outcome.get("error") or "unknown error")
+        # P14 self-healing: classify; only permanent errors skip retries
+        try:
+            from ariadne_runtime.doctor import classify
+
+            diag = classify(err)
+        except Exception:
+            diag = None
+        if diag is not None and diag.cls == "permanent":
+            self._store.mark_failed_terminal(
+                task_id,
+                f"[{diag.cls}] {err[:300]} | fix: {diag.human_message}")
+            return
         new_state = self._store.mark_failed(task_id, err)
         if new_state == "ready":
             logger.info("graph_exec: %s failed, retrying (%s)",
                         task_id, err[:120])
-        # 'failed' is terminal; next loop's cascade_skip skips descendants.
 
     # ── task execution ────────────────────────────────────────────────────
     @staticmethod

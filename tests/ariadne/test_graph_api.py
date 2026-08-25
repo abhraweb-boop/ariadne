@@ -85,7 +85,6 @@ def test_runs_api_endpoints(monkeypatch, tmp_path):
     tstore = TaskStore(tmp_path / "t.db")
     monkeypatch.setattr(ag, "_store", lambda: tstore)
     monkeypatch.setattr(ag, "_tasks_store", lambda: tstore)
-
     pid = tstore.create_plan("dogfood run", [
         {"id": "a", "kind": "note"},
         {"id": "b", "kind": "note", "depends_on": ["a"]},
@@ -115,5 +114,10 @@ def test_runs_api_endpoints(monkeypatch, tmp_path):
 
     r = client.get("/api/ariadne/graph/runs/plan-nope")
     assert r.status_code == 404
+
+    # Flow tab page serves and carries the branding
+    r = client.get("/api/ariadne/graph/flow")
+    assert r.status_code == 200
+    assert b"PRIME HERMES" in r.content
 
     tstore.close()

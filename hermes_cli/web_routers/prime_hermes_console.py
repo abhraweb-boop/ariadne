@@ -91,6 +91,28 @@ def console_status() -> Dict[str, Any]:
             out["last_plan"] = None
     except Exception:
         out["last_plan"] = None
+    # P13/P14 surfaces: google + flo status, budget governor state
+    try:
+        from ariadne_runtime import google_provider as gp
+
+        out["google"] = gp.status()
+    except Exception as exc:  # pragma: no cover
+        out["google"] = {"ok": False, "state": "error", "hint": str(exc)[:120]}
+    try:
+        from ariadne_runtime import flo_engine as fe
+
+        out["flo"] = fe.status()
+    except Exception as exc:  # pragma: no cover
+        out["flo"] = {"ok": False, "state": "error", "hint": str(exc)[:120]}
+    try:
+        from ariadne_runtime.doctor import get_budget
+
+        g = get_budget().gate()
+        out["budget"] = {**g,
+                         "configured": getattr(get_budget(), "cap", 5.0)
+                         != 5.0}
+    except Exception:
+        out["budget"] = {"configured": False}
     return out
 
 
@@ -197,6 +219,9 @@ _CONSOLE_HTML = """<!DOCTYPE html>
   <span id="st-model" class="badge">…</span>
   <span id="st-tier" class="badge">tier: …</span>
   <span id="st-engine" class="badge">engine: …</span>
+  <span id="st-google" class="badge" title="Gemini provider">g:…</span>
+  <span id="st-flo" class="badge" title="ruflo swarm engine">flo:…</span>
+  <span id="st-budget" class="badge" title="budget governor">$0/$5</span>
   <span style="margin-left:auto">/help for commands</span>
 </header>
 <div id="scroller"></div>
@@ -235,6 +260,25 @@ async function refreshStatus() {
       document.getElementById("st-engine").textContent = "engine: down";
       document.getElementById("st-model").textContent = "—";
       line("[console] engine down: " + (s.reason || "unknown"), "err");
+    }
+    const gEl = document.getElementById("st-google");
+    if (s.google && s.google.state) {
+      gEl.textContent = "g:" + s.google.state;
+      gEl.style.color = s.google.ok ? "var(--ok)"
+        : (s.google.state === "no_key" ? "var(--warn)" : "var(--err)");
+    }
+    const fEl = document.getElementById("st-flo");
+    if (s.flo && s.flo.state) {
+      fEl.textContent = "flo:" + s.flo.state;
+      fEl.style.color = s.flo.ok ? "var(--ok)" : "var(--dim)";
+    }
+    const bEl = document.getElementById("st-budget");
+    if (s.budget && typeof s.budget.spent === "number") {
+      bEl.textContent = "$" + s.budget.spent.toFixed(2) + "/" +
+        s.budget.cap.toFixed(0);
+      bEl.style.color = s.budget.paused ? "var(--err)"
+        : (s.budget.spent >= s.budget.cap * 0.5 ? "var(--warn)"
+           : "var(--dim)");
     }
   } catch (e) {
     line("[console] status failed: " + e, "err");

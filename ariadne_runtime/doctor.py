@@ -27,6 +27,7 @@ TRANSIENT_PATTERNS = [
     r"connection ?reset", r"timed? ?out", r"temporarily unavailable",
     r"429", r"too many requests", r"econnreset", r"etimedout",
     r"read econn", r"remote disconnected", "ssl", r"502", r"503",
+    r"\btransient\b",
 ]
 ENVIRONMENTAL_PATTERNS = [
     (r"(?:no module named|modulenotfounderror:?|importerror:?)\s*"
@@ -242,4 +243,22 @@ class BudgetGovernor:
         self.paused = False
 
 
-__all__ = ["classify", "Diagnosis", "ErrorDoctor", "BudgetGovernor"]
+# ── process-wide governor (Console reads this) ────────────────────────────
+_active_governor: Optional["BudgetGovernor"] = None
+
+
+def get_budget() -> "BudgetGovernor":
+    global _active_governor
+    if _active_governor is None:
+        _active_governor = BudgetGovernor()
+    return _active_governor
+
+
+def set_budget_cap(cap_usd: float) -> "BudgetGovernor":
+    global _active_governor
+    _active_governor = BudgetGovernor(cap_usd=float(cap_usd))
+    return _active_governor
+
+
+__all__ = ["classify", "Diagnosis", "ErrorDoctor", "BudgetGovernor",
+           "get_budget", "set_budget_cap"]

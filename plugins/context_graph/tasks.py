@@ -306,6 +306,24 @@ class TaskStore:
             self._conn.commit()
         self._refresh_mirror(task_id)
 
+    def mark_failed_terminal(self, task_id: str, error: str) -> None:
+        """Fail WITHOUT offering a retry (permanent-class errors, P14).
+
+        Attempts are pinned to max_attempts so mark_failed's retry logic
+        cannot resurrect the node.
+        """
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT max_attempts FROM tasks WHERE id=?",
+                (task_id,)).fetchone()
+            cap = int(row["max_attempts"]) if row else 1
+            self._conn.execute(
+                "UPDATE tasks SET state='failed', attempts=?, error=?, "
+                "finished_at=? WHERE id=?",
+                (cap, (error or "")[:500], time.time(), task_id))
+            self._conn.commit()
+        self._refresh_mirror(task_id)
+
     def insert_task(self, plan_id: str, spec: Dict[str, Any],
                     *, scope: bool = True) -> str:
         """Insert one additional task into an EXISTING plan (Phase 10).

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import HTMLResponse
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +115,144 @@ def runs_list(limit: int = Query(10, ge=1, le=50)) -> Dict[str, Any]:
     except Exception as exc:  # pragma: no cover
         logger.exception("runs list failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ── Phase 8-D: the Flow tab (live plan visualization) ─────────────────────
+_FLOW_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Prime Hermes — Flow</title>
+<style>
+  :root {
+    --bg:#0b0e14; --fg:#d6deeb; --dim:#5f6b7d; --accent:#7aa2f7;
+    --ok:#9ece6a; --warn:#e0af68; --err:#f7768e; --line:#1e2430;
+    --run:#bb9af7;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--fg);
+    font:14px/1.5 "Cascadia Code",Consolas,monospace; padding:16px; }
+  header { display:flex; gap:12px; align-items:center; margin-bottom:14px; }
+  header b { color:var(--accent); }
+  select { background:#11151f; color:var(--fg); border:1px solid var(--line);
+    padding:4px 8px; border-radius:4px; font:inherit; }
+  #meta { color:var(--dim); font-size:12px; margin-bottom:10px; min-height:18px; }
+  .lane { display:flex; flex-direction:column; gap:0; position:relative; }
+  .node {
+    display:flex; align-items:center; gap:10px;
+    border:1px solid var(--line); border-left:4px solid var(--dim);
+    border-radius:6px; padding:9px 12px; margin:0 0 14px 0;
+    background:#10141d; max-width:720px; transition:border-color .3s;
+  }
+  .node.done   { border-left-color:var(--ok); }
+  .node.running{ border-left-color:var(--run); animation:pulse 1.1s infinite; }
+  .node.failed { border-left-color:var(--err); }
+  .node.bypassed{ border-left-color:var(--warn); opacity:.75; }
+  .node.skipped{ opacity:.45; }
+  @keyframes pulse { 50% { opacity:.55; } }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--dim);
+    flex:none; }
+  .node.done .dot { background:var(--ok); }
+  .node.running .dot { background:var(--run); }
+  .node.failed .dot { background:var(--err); }
+  .node.bypassed .dot { background:var(--warn); }
+  .kind { color:var(--dim); font-size:11px; border:1px solid var(--line);
+    padding:0 5px; border-radius:3px; flex:none; }
+  .title { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .state { font-size:11px; flex:none; }
+  .node.done .state { color:var(--ok); }
+  .node.running .state { color:var(--run); }
+  .node.failed .state { color:var(--err); }
+  .node.bypassed .state { color:var(--warn); }
+  .error { color:var(--err); font-size:12px; margin:-10px 0 12px 22px;
+    max-width:700px; white-space:pre-wrap; }
+  .arrow { color:var(--dim); margin:-9px 0 -5px 24px; font-size:11px; }
+  footer { margin-top:18px; color:var(--dim); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <b>PRIME HERMES · FLOW</b>
+  <select id="picker"><option>loading runs…</option></select>
+  <span id="plan-state" class="kind"></span>
+</header>
+<div id="meta"></div>
+<div id="flow" class="lane"></div>
+<footer>polling every 2s · green=done · purple pulse=running · red=failed
+· amber=bypassed (gate) · grey=skipped</footer>
+<script>
+const flow = document.getElementById("flow");
+const picker = document.getElementById("picker");
+const meta = document.getElementById("meta");
+const stateEl = document.getElementById("plan-state");
+let current = null;
+
+async function jget(u){ const r = await fetch(u); return r.json(); }
+
+async function loadPicker(){
+  const d = await jget(location.origin + "/api/ariadne/graph/runs?limit=25");
+  if (!d.ok) return;
+  picker.innerHTML = "";
+  for (const p of d.plans){
+    const o = document.createElement("option");
+    o.value = p.id;
+    o.textContent = p.goal + " (" + p.state + ")";
+    picker.appendChild(o);
+  }
+  if (!current && d.plans.length) current = d.plans[0].id;
+  if (current) picker.value = current;
+}
+
+function render(d){
+  if (!d.ok){ meta.textContent = "run not found"; flow.innerHTML = ""; return; }
+  stateEl.textContent = d.plan.state;
+  meta.textContent = d.plan.goal + " — " +
+    Object.entries(d.counts).map(([k,v])=>v+" "+k).join(" · ");
+  flow.innerHTML = "";
+  for (const t of d.tasks){
+    const n = document.createElement("div");
+    n.className = "node " + t.state;
+    n.innerHTML = '<span class="dot"></span>' +
+      '<span class="kind">' + t.kind + '</span>' +
+      '<span class="title"></span>' +
+      '<span class="state">' + t.state +
+      (t.attempts>1 ? ' ×'+t.attempts : '') + '</span>';
+    n.querySelector(".title").textContent = t.title || t.id;
+    flow.appendChild(n);
+    if ((t.depends_on||[]).length && t !== d.tasks[d.tasks.length-1]){
+      const a = document.createElement("div");
+      a.className = "arrow"; a.textContent = "↓";
+      flow.appendChild(a);
+    }
+    if (t.error){
+      const e = document.createElement("div");
+      e.className = "error";
+      e.textContent = "⚠ " + t.error;
+      flow.appendChild(e);
+    }
+  }
+}
+
+async function tick(){
+  try {
+    if (!current || !picker.options.length) await loadPicker();
+    if (!current) { meta.textContent = "no runs yet — execute a plan first"; return; }
+    const d = await jget("/api/ariadne/graph/runs/" + current);
+    render(d);
+  } catch(e){ /* transient */ }
+}
+picker.addEventListener("change", () => { current = picker.value; tick(); });
+tick(); setInterval(tick, 2000); setInterval(loadPicker, 15000);
+</script>
+</body>
+</html>
+"""
+
+
+@router.get("/flow", response_class=HTMLResponse, include_in_schema=False)
+def flow_page() -> HTMLResponse:
+    """Live Flow view over /runs data (P8-D)."""
+    return HTMLResponse(_FLOW_HTML)
 
 
 @router.get("/timeline")
