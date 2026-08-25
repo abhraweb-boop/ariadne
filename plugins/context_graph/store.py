@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sqlite3
 import threading
 import time
@@ -130,7 +131,13 @@ class GraphStore:
         return 1.0 / (1.0 + age_days)
 
     def seeds_by_keyword(self, query: str, *, limit: int = 5) -> List[str]:
-        words = [w for w in (query or "").split() if len(w) >= 3][:8]
+        # Strip punctuation so prompt tokens like "phase6," or "deploy?" still
+        # match node titles (live-gate finding: LIKE missed punctuated seeds).
+        words = [
+            re.sub(r"[^\w\-./]+", "", w)
+            for w in (query or "").split()
+        ]
+        words = [w for w in words if len(w) >= 3][:8]
         if not words:
             return []
         clauses = " OR ".join("title LIKE ?" for _ in words)

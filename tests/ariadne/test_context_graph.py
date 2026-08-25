@@ -82,6 +82,15 @@ def test_seeds_by_keyword_matches_titles(store: GraphStore):
     assert hits and hits[0] == node_id("file", "deploy.py")
 
 
+def test_seeds_strip_punctuation_from_prompt_tokens(store: GraphStore):
+    """Live-gate regression: 'phase6,' with a trailing comma must still match
+    the node titled architecture-ariadne-phase6.md."""
+    store.touch("file", "architecture-ariadne-phase6.md",
+                title="architecture-ariadne-phase6.md")
+    hits = store.seeds_by_keyword("what does phase6, cover?")
+    assert hits and hits[0] == node_id("file", "architecture-ariadne-phase6.md")
+
+
 def test_prune_removes_stale_singletons(store: GraphStore):
     old = store.touch("url", "old.example.com")
     hub = store.touch("session", "keeper")
