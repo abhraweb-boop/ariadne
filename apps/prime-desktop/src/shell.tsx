@@ -10,17 +10,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { registerCoreActions } from './actions-registry'
 import { get, post } from './api'
 import { KernelCellCard, TaskCard, type TaskInfo, ToolCallCard } from './cards'
+import { CommandPalette } from './components/command-palette'
+import { ErrorBoundary } from './components/error-boundary'
+import { FindBar } from './components/find-bar'
+import { Notifications } from './components/notifications'
+import { Statusbar } from './components/statusbar'
+import { Titlebar } from './components/titlebar'
 import { type BusEvent, onEvent, startEventBus } from './event-bus'
+import { highlightSegments } from './lib/highlight'
 import { registerAllPanes } from './panes/index'
 import { getPanes } from './panes/registry'
-import { Titlebar } from './components/titlebar'
-import { Statusbar } from './components/statusbar'
-import { CommandPalette } from './components/command-palette'
-import { FindBar } from './components/find-bar'
-import { registerCoreActions } from './actions-registry'
-import { highlightSegments } from './lib/highlight'
 
 // Register all panes once at module load.
 registerAllPanes()
@@ -155,7 +157,9 @@ export function App() {
         setFindOpen(true)
       }
     }
+
     window.addEventListener('keydown', onKey)
+
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
@@ -212,6 +216,7 @@ export function App() {
         fontSize: 14
       }}
     >
+      <Notifications />
       <Titlebar />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {/* Sessions rail */}
@@ -286,12 +291,13 @@ export function App() {
         {/* Main area */}
         <div style={{ flex: 1, display: 'flex', minHeight: 0, position: 'relative' }}>
           {/* Chat */}
+          <ErrorBoundary>
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             {findOpen && (
               <FindBar
                 messages={messages}
-                onClose={() => { setFindOpen(false); setFindQuery(''); setActiveFind(null) }}
                 onActiveMatch={setActiveFind}
+                onClose={() => { setFindOpen(false); setFindQuery(''); setActiveFind(null) }}
                 onQueryChange={setFindQuery}
               />
             )}
@@ -446,8 +452,10 @@ export function App() {
               </button>
             </div>
           </div>
+          </ErrorBoundary>
 
           {/* Pane overlay */}
+          <ErrorBoundary>
           {activePane && (
             <div
               style={{
@@ -462,6 +470,7 @@ export function App() {
               <activePane.render onClose={() => setOpenPaneId(null)} />
             </div>
           )}
+          </ErrorBoundary>
         </div>
       </div>
 
