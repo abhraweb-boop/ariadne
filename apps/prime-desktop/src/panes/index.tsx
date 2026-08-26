@@ -5,6 +5,7 @@
 
 import { lazy, Suspense } from 'react'
 
+import { FilesPane } from './FilesPane'
 import { registerPane } from './registry'
 
 export function registerAllPanes() {
@@ -72,6 +73,12 @@ export function registerAllPanes() {
         </Suspense>
       )
     }
+  })
+  registerPane({
+    id: 'files',
+    label: 'Files',
+    icon: '📁',
+    render: (props) => <FilesPane {...props} />
   })
   registerPane({
     id: 'skills',
