@@ -7,6 +7,8 @@ import { lazy, Suspense } from 'react'
 
 import { FilesPane } from './FilesPane'
 import { registerPane } from './registry'
+import { ReviewPane } from './ReviewPane'
+import { TerminalPane } from './TerminalPane'
 
 export function registerAllPanes() {
   // Lazy imports — each pane is a separate file, loaded on first open.
@@ -79,6 +81,18 @@ export function registerAllPanes() {
     label: 'Files',
     icon: '📁',
     render: (props) => <FilesPane {...props} />
+  })
+  registerPane({
+    id: 'terminal',
+    label: 'Terminal',
+    icon: '🖥',
+    render: (props) => <TerminalPane {...props} />
+  })
+  registerPane({
+    id: 'review',
+    label: 'Review',
+    icon: '🔍',
+    render: (props) => <ReviewPane {...props} />
   })
   registerPane({
     id: 'skills',
