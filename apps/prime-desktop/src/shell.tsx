@@ -14,6 +14,7 @@ import { registerCoreActions } from './actions-registry'
 import { get, post } from './api'
 import { KernelCellCard, TaskCard, type TaskInfo, ToolCallCard } from './cards'
 import { CommandPalette } from './components/command-palette'
+import { Composer } from './components/composer'
 import { ErrorBoundary } from './components/error-boundary'
 import { FindBar } from './components/find-bar'
 import { MarkdownText } from './components/markdown-text'
@@ -411,50 +412,12 @@ export function App() {
               )}
               <div ref={endRef} />
             </div>
-            <div
-              style={{
-                display: 'flex',
-                gap: 8,
-                padding: '10px 14px',
-                borderTop: '1px solid #2a2a2a'
-              }}
-            >
-              <input
-                disabled={sending}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
-                }}
-                placeholder="Send a message to the Prime worker…"
-                style={{
-                  flex: 1,
-                  background: 'color-mix(in srgb, #efefef 6%, transparent)',
-                  border: '1px solid #2a2a2a',
-                  borderRadius: 6,
-                  padding: '8px 12px',
-                  color: 'inherit',
-                  fontSize: 13,
-                  fontFamily: 'inherit'
-                }}
-                value={input}
-              />
-              <button
-                disabled={sending}
-                onClick={send}
-                style={{
-                  background: sending ? '#555' : 'var(--accent, #5e6ad2)',
-                  border: 'none',
-                  color: '#fff',
-                  borderRadius: 6,
-                  padding: '8px 16px',
-                  cursor: sending ? 'default' : 'pointer',
-                  fontSize: 13,
-                  fontFamily: 'inherit'
-                }}
-              >
-                {sending ? '…' : 'Send'}
-              </button>
-            </div>
+            <Composer
+              input={input}
+              onInputChange={setInput}
+              onSend={send}
+              sending={sending}
+            />
           </div>
           </ErrorBoundary>
 

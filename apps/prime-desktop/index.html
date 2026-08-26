@@ -11,6 +11,11 @@
       /* A1: titlebar drag regions (class-based so tests can assert them) */
       .ph-drag { -webkit-app-region: drag; }
       .ph-no-drag { -webkit-app-region: no-drag; }
+      /* B2: streaming indicator animation */
+      @keyframes ph-stream {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+      }
     </style>
   </head>
   <body>
