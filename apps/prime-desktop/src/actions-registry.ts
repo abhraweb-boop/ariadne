@@ -17,6 +17,10 @@ export function registerCoreActions(handlers: {
     { id: 'kernel', label: 'Open Kernel Console', keywords: ['kernel', 'cell', 'python', 'repl'] },
     { id: 'agents', label: 'Open Agents', keywords: ['agents', 'prime', 'worker', 'swarm'] },
     { id: 'graph', label: 'Open Graph Lens', keywords: ['graph', 'context', 'nodes'] },
+    { id: 'files', label: 'Open Files', keywords: ['files', 'browse', 'workspace'] },
+    { id: 'terminal', label: 'Open Terminal', keywords: ['terminal', 'shell'] },
+    { id: 'review', label: 'Open Review', keywords: ['review', 'git', 'diff', 'changes'] },
+    { id: 'cost', label: 'Open Cost Breakdown', keywords: ['cost', 'tokens', 'spend'] },
     { id: 'skills', label: 'Open Skills & Tools', keywords: ['skills', 'tools', 'mcp'] },
     { id: 'ledger', label: 'Open Refine Ledger', keywords: ['ledger', 'memory', 'rollback', 'refine'] },
     { id: 'settings', label: 'Open Settings', keywords: ['settings', 'config', 'preferences'] }
