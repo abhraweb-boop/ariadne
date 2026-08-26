@@ -19,6 +19,7 @@ import { ErrorBoundary } from './components/error-boundary'
 import { FindBar } from './components/find-bar'
 import { MarkdownText } from './components/markdown-text'
 import { Notifications } from './components/notifications'
+import { SessionPicker } from './components/session-picker'
 import { SessionRail } from './components/session-rail'
 import { Statusbar } from './components/statusbar'
 import { StreamingCaret } from './components/streaming-caret'
@@ -28,6 +29,7 @@ import { highlightSegments } from './lib/highlight'
 import { streamReducer } from './lib/stream-reducer'
 import { registerAllPanes } from './panes/index'
 import { getPanes } from './panes/registry'
+import { listSessions } from './sessions'
 import { installShortcuts, registerShortcut } from './shortcuts'
 
 // Register all panes once at module load.
@@ -63,6 +65,7 @@ export function App() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [openPaneId, setOpenPaneId] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [findOpen, setFindOpen] = useState(false)
   const [findQuery, setFindQuery] = useState('')
   const [activeFind, setActiveFind] = useState<{ messageIndex: number; textIndex: number } | null>(null)
@@ -73,6 +76,9 @@ export function App() {
   const [tokenCount, setTokenCount] = useState(0)
   const [planCount, setPlanCount] = useState(0)
   const endRef = useRef<HTMLDivElement>(null)
+  const sessionIdRef = useRef<string | null>(null)
+  // Keep ref in sync with sessionId
+  useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
   // S5: resume banner
   const [finishedAway, setFinishedAway] = useState<FinishedAwayPlan[]>([])
 
@@ -154,6 +160,25 @@ export function App() {
       label: 'Find in conversation',
       combo: 'Ctrl+F',
       handler: () => setFindOpen(true)
+    })
+    registerShortcut({
+      id: 'session:pick',
+      label: 'Switch session',
+      combo: 'Ctrl+P',
+      handler: () => setPickerOpen(true)
+    })
+    // Ctrl+Tab cycles sessions (Hermes desktop switcher behavior)
+    registerShortcut({
+      id: 'session:cycle',
+      label: 'Cycle sessions',
+      combo: 'Ctrl+Tab',
+      handler: () => {
+        void listSessions().then((list) => {
+          if (list.length === 0) {return}
+          const idx = list.findIndex((s) => s.id === sessionIdRef.current)
+          setSessionId(list[(idx + 1) % list.length].id)
+        })
+      }
     })
 
     return installShortcuts()
@@ -411,6 +436,14 @@ export function App() {
 
       {/* Command palette (A3) */}
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+
+      {/* Session picker (C2) */}
+      {pickerOpen && (
+        <SessionPicker
+          onClose={() => setPickerOpen(false)}
+          onSelect={(id) => setSessionId(id)}
+        />
+      )}
     </div>
   )
 }
