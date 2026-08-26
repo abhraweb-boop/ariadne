@@ -16,6 +16,7 @@ import { type BusEvent, onEvent, startEventBus } from './event-bus'
 import { registerAllPanes } from './panes/index'
 import { getPanes } from './panes/registry'
 import { Titlebar } from './components/titlebar'
+import { Statusbar } from './components/statusbar'
 
 // Register all panes once at module load.
 registerAllPanes()
@@ -404,24 +405,8 @@ export function App() {
         </div>
       </div>
 
-      {/* Statusbar (S3 — cost meter, model badge, SSE status) */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-          padding: '3px 14px',
-          borderTop: '1px solid #2a2a2a',
-          fontSize: 11,
-          color: '#888',
-          fontVariantNumeric: 'tabular-nums'
-        }}
-      >
-        <span>⚡ Worker: {primeState}</span>
-        <span>| Tokens: ~{tokenCount}</span>
-        <span>| Plans: {planCount}</span>
-        <span style={{ marginLeft: 'auto' }}>Prime Hermes v0.1.0</span>
-      </div>
+      {/* Statusbar (A2 — port of Hermes statusbar-controls; G2 adds prime widgets) */}
+      <Statusbar onOpenPane={(id) => setOpenPaneId(id)} />
     </div>
   )
 }
