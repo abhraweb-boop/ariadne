@@ -3019,6 +3019,7 @@ from hermes_cli.web_routers import ariadne_graph as _ariadne_graph_routes  # noq
 app.include_router(_ariadne_graph_routes.router)
 
 from hermes_cli.web_routers import (  # noqa: E402
+    ariadne_files as _ariadne_files_routes,
     ariadne_kernel as _ariadne_kernel_routes,
     ariadne_plans as _ariadne_plans_routes,
     prime_rpc as _prime_rpc_routes,
@@ -3027,6 +3028,7 @@ from hermes_cli.web_routers import (  # noqa: E402
 app.include_router(_ariadne_kernel_routes.router)
 app.include_router(_ariadne_plans_routes.router)
 app.include_router(_prime_rpc_routes.router)
+app.include_router(_ariadne_files_routes.router)
 
 from hermes_cli.web_routers import prime_hermes_console as _ph_console_routes  # noqa: E402
 
