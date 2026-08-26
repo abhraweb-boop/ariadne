@@ -23,6 +23,7 @@ import { type BusEvent, onEvent, startEventBus } from './event-bus'
 import { highlightSegments } from './lib/highlight'
 import { registerAllPanes } from './panes/index'
 import { getPanes } from './panes/registry'
+import { installShortcuts, registerShortcut } from './shortcuts'
 
 // Register all panes once at module load.
 registerAllPanes()
@@ -138,7 +139,7 @@ export function App() {
       .catch(() => {})
   }, [])
 
-  // A3: register core actions + open palette on Ctrl+K
+  // A3+A6: register core actions + shortcuts through the central registry
   useEffect(() => {
     registerCoreActions({
       openPane: (id) => setOpenPaneId(id),
@@ -148,19 +149,20 @@ export function App() {
       }
     })
 
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        setPaletteOpen(true)
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
-        e.preventDefault()
-        setFindOpen(true)
-      }
-    }
+    registerShortcut({
+      id: 'palette:open',
+      label: 'Open command palette',
+      combo: 'Ctrl+K',
+      handler: () => setPaletteOpen(true)
+    })
+    registerShortcut({
+      id: 'find:open',
+      label: 'Find in conversation',
+      combo: 'Ctrl+F',
+      handler: () => setFindOpen(true)
+    })
 
-    window.addEventListener('keydown', onKey)
-
-    return () => window.removeEventListener('keydown', onKey)
+    return installShortcuts()
   }, [])
 
   // Load sessions + poll plans count
