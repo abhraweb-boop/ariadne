@@ -172,6 +172,15 @@ class TaskStore:
             )
             self._conn.commit()
 
+    def list_plan_tasks(self, plan_id: str) -> List[Dict[str, Any]]:
+        with self._lock:
+            return [
+                dict(r) for r in self._conn.execute(
+                    "SELECT * FROM tasks WHERE plan_id=? ORDER BY created_at",
+                    (plan_id,),
+                )
+            ]
+
     def delete_plan(self, plan_id: str) -> bool:
         with self._lock:
             cur = self._conn.execute("DELETE FROM plans WHERE id=?", (plan_id,))
