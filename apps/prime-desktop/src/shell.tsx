@@ -308,11 +308,11 @@ export function App() {
               {finishedAway.length > 0 && (
                 <div
                   style={{
-                    border: '1px solid #9ece6a',
+                    border: '1px solid var(--accent, #9ece6a)',
                     borderRadius: 8,
                     padding: 10,
                     marginBottom: 12,
-                    background: 'color-mix(in srgb, #9ece6a 8%, transparent)'
+                    background: 'color-mix(in srgb, var(--accent, #9ece6a) 8%, transparent)'
                   }}
                 >
                   <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
@@ -323,7 +323,7 @@ export function App() {
                       <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.goal.slice(0, 80)}
                       </span>
-                      <span style={{ fontSize: 11, color: '#9ece6a', border: '1px solid #9ece6a', borderRadius: 999, padding: '0 8px' }}>
+                      <span style={{ fontSize: 11, color: 'var(--accent, #9ece6a)', border: '1px solid var(--accent, #9ece6a)', borderRadius: 999, padding: '0 8px' }}>
                         {p.state}
                       </span>
                       <button
@@ -346,7 +346,7 @@ export function App() {
                 </div>
               )}
               {!sessionId && (
-                <p style={{ color: '#888', fontSize: 13, marginTop: 40, textAlign: 'center' }}>
+                <p style={{ color: 'var(--muted-foreground, #888)', fontSize: 13, marginTop: 40, textAlign: 'center' }}>
                   Select a session or start typing below. The composer sends to the Prime worker.
                 </p>
               )}
@@ -359,7 +359,7 @@ export function App() {
                     borderRadius: 8,
                     background:
                       m.role === 'user'
-                        ? 'color-mix(in srgb, #5e6ad2 15%, transparent)'
+                        ? 'color-mix(in srgb, var(--accent, #5e6ad2) 15%, transparent)'
                         : 'color-mix(in srgb, #efefef 5%, transparent)',
                     maxWidth: '85%',
                     alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start'
@@ -373,8 +373,8 @@ export function App() {
                           key={si}
                           style={{
                             background: activeFind?.messageIndex === messages.indexOf(m)
-                              ? '#e0af68'
-                              : '#5e6ad2',
+                              ? 'var(--accent, #e0af68)'
+                              : 'var(--accent, #5e6ad2)',
                             color: '#101012',
                             borderRadius: 2,
                             padding: '0 1px'

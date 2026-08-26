@@ -97,7 +97,7 @@ export function Ledger({ onClose }: { onClose: () => void }) {
         <div style={{ borderTop: '1px solid var(--border, #2a2a2a)', padding: 10, fontSize: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
             <strong>Version history</strong>
-            <button onClick={() => void rollback()} style={{ marginLeft: 'auto', background: 'none', border: '1px solid #e0af68', borderRadius: 4, padding: '2px 10px', color: '#e0af68', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
+            <button onClick={() => void rollback()} style={{ marginLeft: 'auto', background: 'none', border: '1px solid var(--accent, #e0af68)', borderRadius: 4, padding: '2px 10px', color: 'var(--accent, #e0af68)', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit' }}>
               Rollback
             </button>
           </div>

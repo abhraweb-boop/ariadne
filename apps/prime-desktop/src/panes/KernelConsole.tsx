@@ -58,7 +58,7 @@ export function KernelConsole({ onClose }: { onClose: () => void }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--border, #2a2a2a)' }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>⚡ Kernel Console</span>
-        <span style={{ fontSize: 11, color: status === 'running' ? '#9ece6a' : '#888', fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ fontSize: 11, color: status === 'running' ? 'var(--accent, #9ece6a)' : 'var(--muted-foreground, #888)', fontVariantNumeric: 'tabular-nums' }}>
           {status === 'offline' ? (
             <button onClick={startKernel} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 4, padding: '2px 8px', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit' }}>Start kernel</button>
           ) : `kernel ${status}`}

@@ -13,6 +13,7 @@ const STEPS = [
   { title: 'Welcome', body: 'Welcome to Prime Hermes. Your AI harness.' },
   { title: 'Chat', body: 'Send messages to the Prime worker. Type code, ask questions, run plans.' },
   { title: 'Capabilities', body: 'Manage kernels, DAG plans, agents, and memory from the panel rail.' },
+  { title: 'Beyond chat', body: 'Run Python cells in the kernel, orchestrate multi-step DAG plans, inspect agents, and roll back memory from the panel rail — all live, all yours.' },
   { title: 'Get started', body: 'Type a message to begin, or press Ctrl+K to explore.' }
 ]
 

@@ -313,10 +313,10 @@ export function DagBoard({ onClose }: { onClose: () => void }) {
               onClick={() => void cancelPlan()}
               style={{
                 background: 'none',
-                border: '1px solid #f7768e',
+                border: '1px solid var(--accent, #f7768e)',
                 borderRadius: 4,
                 padding: '4px 12px',
-                color: '#f7768e',
+                color: 'var(--accent, #f7768e)',
                 cursor: 'pointer',
                 fontSize: 12,
                 fontFamily: 'inherit'
@@ -366,9 +366,9 @@ export function DagBoard({ onClose }: { onClose: () => void }) {
 
             const bgColor =
               col === 'running'
-                ? 'color-mix(in srgb, #e0af68 6%, transparent)'
+                ? 'color-mix(in srgb, var(--accent, #e0af68) 6%, transparent)'
                 : col === 'failed'
-                  ? 'color-mix(in srgb, #f7768e 6%, transparent)'
+                  ? 'color-mix(in srgb, var(--accent, #f7768e) 6%, transparent)'
                   : 'transparent'
 
             return (
@@ -449,10 +449,10 @@ export function DagBoard({ onClose }: { onClose: () => void }) {
                   onClick={() => void retryTask(selected.id)}
                   style={{
                     background: 'none',
-                    border: '1px solid #9ece6a',
+                    border: '1px solid var(--accent, #9ece6a)',
                     borderRadius: 4,
                     padding: '2px 8px',
-                    color: '#9ece6a',
+                    color: 'var(--accent, #9ece6a)',
                     cursor: 'pointer',
                     fontSize: 11,
                     fontFamily: 'inherit'
@@ -470,7 +470,7 @@ export function DagBoard({ onClose }: { onClose: () => void }) {
             </span>
           </div>
           {selected.error && (
-            <pre style={{ marginTop: 6, fontSize: 11, color: '#f7768e', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            <pre style={{ marginTop: 6, fontSize: 11, color: 'var(--accent, #f7768e)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {selected.error}
             </pre>
           )}
@@ -580,10 +580,10 @@ export function DagBoard({ onClose }: { onClose: () => void }) {
               {showSlots && activeRecipe && (
                 <div
                   style={{
-                    border: '1px solid #e0af68',
+                    border: '1px solid var(--accent, #e0af68)',
                     borderRadius: 8,
                     padding: 10,
-                    background: 'color-mix(in srgb, #e0af68 6%, transparent)'
+                    background: 'color-mix(in srgb, var(--accent, #e0af68) 6%, transparent)'
                   }}
                 >
                   <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
