@@ -16,6 +16,7 @@ import { KernelCellCard, TaskCard, type TaskInfo, ToolCallCard } from './cards'
 import { CommandPalette } from './components/command-palette'
 import { ErrorBoundary } from './components/error-boundary'
 import { FindBar } from './components/find-bar'
+import { MarkdownText } from './components/markdown-text'
 import { Notifications } from './components/notifications'
 import { Statusbar } from './components/statusbar'
 import { Titlebar } from './components/titlebar'
@@ -386,7 +387,8 @@ export function App() {
                         <span key={si}>{seg.text}</span>
                       )
                     )}
-                    {!findQuery && m.text}
+                    {!findQuery && m.role === 'assistant' && <MarkdownText text={m.text} />}
+                    {!findQuery && m.role !== 'assistant' && m.text}
                   </div>
                   {m.cards?.map((c, i) => {
                     if (c.type === 'task')
