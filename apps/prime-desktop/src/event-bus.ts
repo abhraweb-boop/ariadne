@@ -24,7 +24,7 @@ let reconnectDelay = 1000
 let started = false
 
 export function startEventBus(): void {
-  if (started) return
+  if (started) {return}
   started = true
   void connect()
 }
@@ -32,10 +32,12 @@ export function startEventBus(): void {
 async function connect(): Promise<void> {
   try {
     const base = await gatewayBase()
-    if (source) source.close()
+
+    if (source) {source.close()}
     source = new EventSource(
       `${base}/api/prime/events${lastEventId ? `?after_id=${encodeURIComponent(lastEventId)}` : ''}`
     )
+
     source.onmessage = (msg) => {
       try {
         const ev = JSON.parse(msg.data) as BusEvent
@@ -46,9 +48,10 @@ async function connect(): Promise<void> {
         /* malformed frame — ignore */
       }
     }
+
     source.onerror = () => {
       // EventSource auto-reconnects; we just track replay position.
-      if (source) source.close()
+      if (source) {source.close()}
       setTimeout(() => void connect(), reconnectDelay)
       reconnectDelay = Math.min(reconnectDelay * 2, 30_000)
     }
@@ -59,9 +62,11 @@ async function connect(): Promise<void> {
 
 function dispatch(ev: BusEvent): void {
   const set = listeners.get(ev.type)
-  if (set) for (const fn of [...set]) fn(ev)
+
+  if (set) {for (const fn of [...set]) {fn(ev)}}
   const all = listeners.get('*')
-  if (all) for (const fn of [...all]) fn(ev)
+
+  if (all) {for (const fn of [...all]) {fn(ev)}}
 }
 
 export function onEvent(
@@ -69,11 +74,14 @@ export function onEvent(
   fn: Listener
 ): () => void {
   let set = listeners.get(type)
+
   if (!set) {
     set = new Set()
     listeners.set(type, set)
   }
+
   set.add(fn)
+
   return () => {
     set!.delete(fn)
   }

@@ -1,0 +1,460 @@
+/**
+ * DAG Board (M3) — live plan execution with state columns, inspector, composer.
+ *
+ * One SSE spine (S1): subscribes to the event bus for plan/task transitions.
+ * No-terminal design: visual columns of cards, point-and-click controls.
+ * Keyboard: ↑/↓, R retry, C cancel, Esc clear.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+import { get, post } from '../api'
+import { type BusEvent, onEvent } from '../event-bus'
+
+interface PlanSummary {
+  id: string
+  goal: string
+  state: string
+  created_at: number
+  n_tasks: number
+  n_done: number
+}
+
+interface TaskView {
+  id: string
+  title: string
+  kind: string
+  state: string
+  depends_on: string[]
+  result?: unknown
+  error?: string
+  max_attempts?: number
+}
+
+const STATE_COLUMNS = ['pending', 'ready', 'running', 'done', 'failed', 'skipped'] as const
+
+const STATE_LABEL: Record<string, string> = {
+  pending: 'Pending', ready: 'Ready', running: 'Running',
+  done: 'Done', failed: 'Failed', skipped: 'Skipped'
+}
+
+export function DagBoard({ onClose }: { onClose: () => void }) {
+  const [planId, setPlanId] = useState<string | null>(null)
+  const [plans, setPlans] = useState<PlanSummary[]>([])
+  const [tasks, setTasks] = useState<TaskView[]>([])
+  const [planState, setPlanState] = useState('')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [composerText, setComposerText] = useState('')
+  const [running, setRunning] = useState(false)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // Load plan list
+  useEffect(() => {
+    void get<{ ok: boolean; plans: PlanSummary[] }>('/api/ariadne/plans').then((r) => {
+      if (r.ok) {setPlans(r.plans)}
+    })
+  }, [])
+
+  // Load a plan's tasks
+  const loadPlan = useCallback(async (pid: string) => {
+    setPlanId(pid)
+
+    try {
+      const r = await get<{ ok: boolean; plan: Record<string, unknown>; tasks: TaskView[]; status: string }>(
+        `/api/ariadne/plans/${pid}`
+      )
+
+      if (r.ok) {
+        setTasks(r.tasks)
+        setPlanState(r.status)
+        setRunning(r.status === 'running')
+      }
+    } catch {
+      setTasks([])
+    }
+  }, [])
+
+  // Subscribe to event bus for real-time updates (S1)
+  useEffect(() => {
+    const unsub = onEvent('plan.completed', (ev: BusEvent) => {
+      const pid = (ev.payload as Record<string, unknown>).plan_id as string
+
+      if (pid === planId) {
+        setRunning(false)
+        setPlanState('done')
+        void loadPlan(pid)
+      }
+    })
+
+    const unsub2 = onEvent('plan.cancelled', (ev: BusEvent) => {
+      const pid = (ev.payload as Record<string, unknown>).plan_id as string
+
+      if (pid === planId) {
+        setRunning(false)
+        setPlanState('cancelled')
+      }
+    })
+
+    return () => {
+      unsub()
+      unsub2()
+    }
+  }, [planId, loadPlan])
+
+  // Reload tasks when plan changes events
+  useEffect(() => {
+    if (planId && running) {
+      const interval = setInterval(() => void loadPlan(planId), 2000)
+
+      return () => clearInterval(interval)
+    }
+  }, [planId, running, loadPlan])
+
+  const grouped = useMemo(() => {
+    const g = new Map<string, TaskView[]>()
+
+    for (const col of STATE_COLUMNS) {g.set(col, [])}
+
+    for (const t of tasks) {
+      const arr = g.get(t.state) ?? []
+      arr.push(t)
+    }
+
+    return g
+  }, [tasks])
+
+  const selected = tasks.find((t) => t.id === selectedId) ?? null
+
+  async function runPlan() {
+    if (!planId) {return}
+    setRunning(true)
+    setPlanState('running')
+    await post(`/api/ariadne/plans/${planId}/run`, {})
+  }
+
+  async function cancelPlan() {
+    if (!planId) {return}
+    await post(`/api/ariadne/plans/${planId}/cancel`, {})
+    setRunning(false)
+    setPlanState('cancelled')
+  }
+
+  async function retryTask(taskId: string) {
+    await post(`/api/ariadne/tasks/${taskId}/retry`, {})
+    await loadPlan(planId!)
+  }
+
+  async function createPlan() {
+    const lines = composerText.trim().split('\n').filter(Boolean)
+
+    if (lines.length === 0) {return}
+
+    const tasks = lines.map((line, i) => ({
+      title: line.replace(/^dep: (\w+): /, '').trim(),
+      kind: 'note' as const,
+      payload: { text: line },
+      depends_on: line.startsWith('dep: ') ? [line.match(/^dep: (\w+)/)![1]] : []
+    }))
+
+    try {
+      const r = await post<{ ok: boolean; plan_id: string }>('/api/ariadne/plans', {
+        goal: composerText.slice(0, 80),
+        tasks
+      })
+
+      if (r.ok) {
+        setComposerText('')
+        void loadPlan(r.plan_id)
+        void get<{ ok: boolean; plans: PlanSummary[] }>('/api/ariadne/plans').then((res) => {
+          if (res.ok) {setPlans(res.plans)}
+        })
+      }
+    } catch (e) {
+      console.error('create plan failed', e)
+    }
+  }
+
+  // S2: Create a sample plan (one-click onboarding)
+  async function createSamplePlan() {
+    try {
+      const r = await post<{ ok: boolean; plan_id: string }>('/api/ariadne/plans', {
+        goal: 'Sample: fetch, analyze, summarize',
+        tasks: [
+          { title: 'fetch-data', kind: 'note', payload: { text: 'fetching' }, depends_on: [] },
+          { title: 'analyze', kind: 'note', payload: { text: 'analyzing' }, depends_on: ['fetch-data'] },
+          { title: 'summarize', kind: 'note', payload: { text: 'summarizing' }, depends_on: ['analyze'] }
+        ]
+      })
+
+      if (r.ok) {
+        await loadPlan(r.plan_id)
+        // Auto-run
+        await runPlan()
+      }
+    } catch (e) {
+      console.error('sample plan failed', e)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Toolbar */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          padding: '8px 12px',
+          borderBottom: '1px solid var(--border, #2a2a2a)',
+          alignItems: 'center'
+        }}
+      >
+        <select
+          aria-label="Select plan"
+          onChange={(e) => void loadPlan(e.target.value)}
+          style={{
+            background: 'color-mix(in srgb, var(--foreground, #efefef) 6%, transparent)',
+            border: '1px solid var(--border, #2a2a2a)',
+            borderRadius: 4,
+            padding: '4px 8px',
+            color: 'inherit',
+            fontSize: 13,
+            fontFamily: 'inherit'
+          }}
+          value={planId ?? ''}
+        >
+          <option value="">— select plan —</option>
+          {plans.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.goal.slice(0, 60)} ({p.state})
+            </option>
+          ))}
+        </select>
+        {planId && (
+          <>
+            <button
+              disabled={running}
+              onClick={() => void runPlan()}
+              style={{
+                background: running ? 'color-mix(in srgb, var(--accent, #5e6ad2) 40%, transparent)' : 'var(--accent, #5e6ad2)',
+                border: 'none',
+                borderRadius: 4,
+                padding: '4px 12px',
+                color: running ? '#888' : '#fff',
+                cursor: running ? 'default' : 'pointer',
+                fontSize: 12,
+                fontFamily: 'inherit'
+              }}
+            >
+              {running ? 'Running…' : 'Run'}
+            </button>
+            <button
+              onClick={() => void cancelPlan()}
+              style={{
+                background: 'none',
+                border: '1px solid #f7768e',
+                borderRadius: 4,
+                padding: '4px 12px',
+                color: '#f7768e',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontFamily: 'inherit'
+              }}
+            >
+              Cancel
+            </button>
+          </>
+        )}
+        <span style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.5, fontVariantNumeric: 'tabular-nums' }}>
+          {planState ? `state: ${planState}` : ''}
+        </span>
+        <button
+          onClick={onClose}
+          style={{ marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {!planId && (
+        <div style={{ padding: 20, textAlign: 'center' }}>
+          <p style={{ opacity: 0.6, marginBottom: 12 }}>Select a plan or create one to see the DAG board.</p>
+          <button
+            onClick={() => void createSamplePlan()}
+            style={{
+              background: 'var(--accent, #5e6ad2)',
+              border: 'none',
+              borderRadius: 6,
+              padding: '8px 20px',
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: 14,
+              fontFamily: 'inherit'
+            }}
+          >
+            🚀 Create & run a sample plan
+          </button>
+        </div>
+      )}
+
+      {/* State columns */}
+      {planId && (
+        <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'auto' }}>
+          {STATE_COLUMNS.map((col) => {
+            const items = grouped.get(col) ?? []
+
+            const bgColor =
+              col === 'running'
+                ? 'color-mix(in srgb, #e0af68 6%, transparent)'
+                : col === 'failed'
+                  ? 'color-mix(in srgb, #f7768e 6%, transparent)'
+                  : 'transparent'
+
+            return (
+              <div
+                key={col}
+                style={{
+                  flex: 1,
+                  minWidth: 120,
+                  borderRight: '1px solid var(--border, #2a2a2a)',
+                  background: bgColor
+                }}
+              >
+                <div
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    color: 'var(--muted-foreground, #888)',
+                    borderBottom: '1px solid var(--border, #2a2a2a)'
+                  }}
+                >
+                  {STATE_LABEL[col] ?? col} {items.length > 0 && `(${items.length})`}
+                </div>
+                <div style={{ padding: 6 }}>
+                  {items.map((task) => (
+                    <button
+                      key={task.id}
+                      onClick={() => setSelectedId(task.id === selectedId ? null : task.id)}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        marginBottom: 6,
+                        padding: '6px 8px',
+                        borderRadius: 6,
+                        textAlign: 'left',
+                        border: selectedId === task.id
+                          ? '1.5px solid var(--accent, #5e6ad2)'
+                          : '1px solid var(--border, #2a2a2a)',
+                        background: '#111',
+                        color: 'inherit',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontFamily: 'inherit'
+                      }}
+                    >
+                      <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {task.title}
+                      </div>
+                      <div style={{ fontSize: 10, opacity: 0.5, marginTop: 2 }}>
+                        {task.kind} · {task.depends_on.length} deps
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Inspector */}
+      {selected && (
+        <div
+          style={{
+            borderTop: '1px solid var(--border, #2a2a2a)',
+            padding: 10,
+            fontSize: 12
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <strong>{selected.title}</strong>
+            <code style={{ fontSize: 10, opacity: 0.5 }}>{selected.id}</code>
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+              {selected.state === 'failed' && (
+                <button
+                  onClick={() => void retryTask(selected.id)}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #9ece6a',
+                    borderRadius: 4,
+                    padding: '2px 8px',
+                    color: '#9ece6a',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  Retry
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedId(null)}
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 14 }}
+              >
+                ✕
+              </button>
+            </span>
+          </div>
+          {selected.error && (
+            <pre style={{ marginTop: 6, fontSize: 11, color: '#f7768e', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {selected.error}
+            </pre>
+          )}
+        </div>
+      )}
+
+      {/* Composer (quick-add plan) */}
+      <div
+        style={{
+          borderTop: '1px solid var(--border, #2a2a2a)',
+          padding: 10,
+          display: 'flex',
+          gap: 8
+        }}
+      >
+        <input
+          onChange={(e) => setComposerText(e.target.value)}
+          placeholder="One task per line. dep: task-id: for dependencies."
+          style={{
+            flex: 1,
+            background: 'color-mix(in srgb, var(--foreground, #efefef) 6%, transparent)',
+            border: '1px solid var(--border, #2a2a2a)',
+            borderRadius: 4,
+            padding: '6px 10px',
+            color: 'inherit',
+            fontSize: 12,
+            fontFamily: 'inherit'
+          }}
+          value={composerText}
+        />
+        <button
+          onClick={() => void createPlan()}
+          style={{
+            background: 'var(--accent, #5e6ad2)',
+            border: 'none',
+            borderRadius: 4,
+            padding: '6px 14px',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: 12,
+            fontFamily: 'inherit'
+          }}
+        >
+          Create Plan
+        </button>
+      </div>
+    </div>
+  )
+}

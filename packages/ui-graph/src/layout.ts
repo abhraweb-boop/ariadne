@@ -7,7 +7,24 @@
  * positions — the layout is a pure function of the graph.
  */
 
-import type { GraphEdge, GraphNode } from './api'
+export interface GraphNode {
+  id: string
+  type: string
+  key: string
+  title: string
+  meta: string
+  first_seen: number
+  last_seen: number
+  touches: number
+}
+
+export interface GraphEdge {
+  src: string
+  rel: string
+  dst: string
+  weight: number
+  last_seen: number
+}
 
 export interface LaidOutNode extends GraphNode {
   x: number

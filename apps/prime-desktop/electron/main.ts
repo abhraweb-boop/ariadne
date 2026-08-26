@@ -7,10 +7,11 @@
  * fetch/EventSource through the bridge.
  */
 
-import { app, BrowserWindow, ipcMain } from 'electron'
 import { existsSync, readFileSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { app, BrowserWindow, ipcMain } from 'electron'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -19,16 +20,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 // 3 = default localhost.
 function resolveGatewayBase(): string {
   const fromEnv = process.env.PRIME_GATEWAY_BASE
-  if (fromEnv) return fromEnv.replace(/\/+$/, '')
+
+  if (fromEnv) {return fromEnv.replace(/\/+$/, '')}
   const stamp = join(__dirname, '..', 'install-stamp.json')
+
   try {
     if (existsSync(stamp)) {
       const data = JSON.parse(readFileSync(stamp, 'utf-8'))
-      if (data?.gatewayBase) return String(data.gatewayBase).replace(/\/+$/, '')
+
+      if (data?.gatewayBase) {return String(data.gatewayBase).replace(/\/+$/, '')}
     }
   } catch {
     /* fall through to default */
   }
+
   return 'http://127.0.0.1:8000'
 }
 
@@ -49,11 +54,13 @@ function createWindow(): BrowserWindow {
   })
 
   const devServer = process.env.HERMES_DESKTOP_DEV_SERVER
+
   if (devServer) {
     void win.loadURL(devServer)
   } else {
     void win.loadFile(join(__dirname, '..', 'dist', 'index.html'))
   }
+
   return win
 }
 
@@ -72,10 +79,10 @@ app.whenReady().then(() => {
   createWindow()
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {createWindow()}
   })
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  if (process.platform !== 'darwin') {app.quit()}
 })

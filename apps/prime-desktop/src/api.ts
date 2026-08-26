@@ -19,13 +19,15 @@ declare global {
 let cachedBase: string | null = null
 
 export async function gatewayBase(): Promise<string> {
-  if (cachedBase) return cachedBase
+  if (cachedBase) {return cachedBase}
+
   if (window.primeHermes) {
     cachedBase = await window.primeHermes.gatewayBase()
   } else {
     // Browser dev fallback (vite without electron): assume local gateway.
     cachedBase = 'http://127.0.0.1:8000'
   }
+
   return cachedBase
 }
 
@@ -42,10 +44,12 @@ export async function api<T = unknown>(
 ): Promise<T> {
   const base = await gatewayBase()
   const controller = new AbortController()
+
   const timeout = setTimeout(
     () => controller.abort(),
     opts.timeoutMs ?? 60_000
   )
+
   try {
     const res = await fetch(`${base}${path}`, {
       method: opts.method ?? 'GET',
@@ -56,10 +60,12 @@ export async function api<T = unknown>(
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
       signal: controller.signal
     })
+
     if (!res.ok) {
       const text = await res.text().catch(() => '')
       throw new Error(`API ${opts.method ?? 'GET'} ${path} -> ${res.status}: ${text.slice(0, 300)}`)
     }
+
     return (await res.json()) as T
   } finally {
     clearTimeout(timeout)
