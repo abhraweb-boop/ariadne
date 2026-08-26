@@ -20,9 +20,11 @@ import { FindBar } from './components/find-bar'
 import { MarkdownText } from './components/markdown-text'
 import { Notifications } from './components/notifications'
 import { Statusbar } from './components/statusbar'
+import { StreamingCaret } from './components/streaming-caret'
 import { Titlebar } from './components/titlebar'
 import { type BusEvent, onEvent, startEventBus } from './event-bus'
 import { highlightSegments } from './lib/highlight'
+import { streamReducer } from './lib/stream-reducer'
 import { registerAllPanes } from './panes/index'
 import { getPanes } from './panes/registry'
 import { installShortcuts, registerShortcut } from './shortcuts'
@@ -82,29 +84,19 @@ export function App() {
       const typ = ev.type
       const payload = ev.payload as Record<string, unknown>
 
-      // Accumulate text deltas
+      // Accumulate text deltas (B3: via tested streamReducer)
       if (typ === 'prime.message_update') {
         const assistant = payload.assistantMessageEvent as Record<string, unknown> | undefined
 
         if (assistant?.type === 'text_delta') {
           const delta = (assistant.delta as string) ?? ''
-          setMessages((prev) => {
-            const last = prev[prev.length - 1]
-
-            if (last?.role === 'assistant') {
-              const next = [...prev]
-              next[next.length - 1] = { ...last, text: last.text + delta }
-
-              return next
-            }
-
-            return [...prev, { id: `msg-${Date.now()}`, role: 'assistant', text: delta }]
-          })
+          setMessages((prev) => streamReducer(prev, { type: 'delta', delta }))
         }
       }
 
       if (typ === 'prime.agent_end') {
         setSending(false)
+        setMessages((prev) => streamReducer(prev, { type: 'finalize' }))
       }
 
       // Update prime state badge
@@ -192,12 +184,12 @@ export function App() {
     if (!text || sending) {return}
     setInput('')
     setSending(true)
-    setMessages((prev) => [...prev, { id: `msg-${Date.now()}`, role: 'user', text }])
+    setMessages((prev) => streamReducer(prev, { type: 'user', text }))
 
     try {
       await post('/api/prime/prompt', { prompt: text })
     } catch (e) {
-      setMessages((prev) => [...prev, { id: `msg-${Date.now()}`, role: 'system', text: `Error: ${String(e)}` }])
+      setMessages((prev) => streamReducer(prev, { type: 'system', text: `Error: ${String(e)}` }))
       setSending(false)
     }
   }, [input, sending])
@@ -390,6 +382,10 @@ export function App() {
                     )}
                     {!findQuery && m.role === 'assistant' && <MarkdownText text={m.text} />}
                     {!findQuery && m.role !== 'assistant' && m.text}
+                    {/* B3: streaming caret on the last assistant message */}
+                    {sending && m.role === 'assistant' && m.id === messages[messages.length - 1]?.id && (
+                      <StreamingCaret />
+                    )}
                   </div>
                   {m.cards?.map((c, i) => {
                     if (c.type === 'task')
@@ -405,11 +401,6 @@ export function App() {
                   })}
                 </div>
               ))}
-              {sending && (
-                <div style={{ color: '#888', fontSize: 12, padding: '8px 12px' }}>
-                  Prime worker responding…
-                </div>
-              )}
               <div ref={endRef} />
             </div>
             <Composer
