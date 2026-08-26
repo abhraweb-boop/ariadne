@@ -18,7 +18,9 @@ import { getPanes } from './panes/registry'
 import { Titlebar } from './components/titlebar'
 import { Statusbar } from './components/statusbar'
 import { CommandPalette } from './components/command-palette'
+import { FindBar } from './components/find-bar'
 import { registerCoreActions } from './actions-registry'
+import { highlightSegments } from './lib/highlight'
 
 // Register all panes once at module load.
 registerAllPanes()
@@ -53,6 +55,9 @@ export function App() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [openPaneId, setOpenPaneId] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [findOpen, setFindOpen] = useState(false)
+  const [findQuery, setFindQuery] = useState('')
+  const [activeFind, setActiveFind] = useState<{ messageIndex: number; textIndex: number } | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -145,6 +150,9 @@ export function App() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setPaletteOpen(true)
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setFindOpen(true)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -279,6 +287,14 @@ export function App() {
         <div style={{ flex: 1, display: 'flex', minHeight: 0, position: 'relative' }}>
           {/* Chat */}
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            {findOpen && (
+              <FindBar
+                messages={messages}
+                onClose={() => { setFindOpen(false); setFindQuery(''); setActiveFind(null) }}
+                onActiveMatch={setActiveFind}
+                onQueryChange={setFindQuery}
+              />
+            )}
             <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
               {/* S5: resume banner — plans finished while the app was away */}
               {finishedAway.length > 0 && (
@@ -342,7 +358,28 @@ export function App() {
                   }}
                 >
                   <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 4 }}>{m.role}</div>
-                  <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{m.text}</div>
+                  <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {findQuery && highlightSegments(m.text, findQuery).map((seg, si) =>
+                      seg.match ? (
+                        <mark
+                          key={si}
+                          style={{
+                            background: activeFind?.messageIndex === messages.indexOf(m)
+                              ? '#e0af68'
+                              : '#5e6ad2',
+                            color: '#101012',
+                            borderRadius: 2,
+                            padding: '0 1px'
+                          }}
+                        >
+                          {seg.text}
+                        </mark>
+                      ) : (
+                        <span key={si}>{seg.text}</span>
+                      )
+                    )}
+                    {!findQuery && m.text}
+                  </div>
                   {m.cards?.map((c, i) => {
                     if (c.type === 'task')
                       {return <TaskCard key={i} onOpenBoard={() => openPane('dags')} task={c.data as unknown as TaskInfo} />}
