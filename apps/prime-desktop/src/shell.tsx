@@ -31,9 +31,13 @@ import { registerAllPanes } from './panes/index'
 import { getPanes } from './panes/registry'
 import { listSessions } from './sessions'
 import { installShortcuts, registerShortcut } from './shortcuts'
+import { applyTheme, loadPrefs } from './themes'
 
 // Register all panes once at module load.
 registerAllPanes()
+
+// Apply theme on load (E1)
+applyTheme(loadPrefs())
 
 // ── Shell ───────────────────────────────────────────────────────────────
 
