@@ -28,6 +28,23 @@ interface Message {
   cards?: Array<{ type: string; data: Record<string, unknown> }>
 }
 
+// S5: detached-execution resume banner state
+interface FinishedAwayPlan {
+  id: string
+  goal: string
+  state: string
+}
+
+const LAST_SEEN_KEY = 'prime-hermes-last-seen-at'
+
+interface PlanSummary {
+  id: string
+  goal: string
+  state: string
+  created_at: number
+  updated_at?: number
+}
+
 export function App() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [openPaneId, setOpenPaneId] = useState<string | null>(null)
@@ -39,6 +56,8 @@ export function App() {
   const [planCount, setPlanCount] = useState(0)
   const endRef = useRef<HTMLDivElement>(null)
   const [sessions, setSessions] = useState<Array<{ id: string; title: string }>>([])
+  // S5: resume banner
+  const [finishedAway, setFinishedAway] = useState<FinishedAwayPlan[]>([])
 
   // Event bus — S1 unified spine, listen for prime events.
   useEffect(() => {
@@ -82,9 +101,34 @@ export function App() {
     return () => unsubPrime()
   }, [])
 
-  // Load sessions
+  // S5: detect plans that finished while the app was closed (detached exec)
   useEffect(() => {
-    void get<{ ok?: boolean; sessions?: Array<{ id: string; title: string }> }>('/api/sessions')
+    const lastSeen = Number(localStorage.getItem(LAST_SEEN_KEY) ?? '0')
+    const now = Date.now()
+    localStorage.setItem(LAST_SEEN_KEY, String(now))
+
+    void get<{ ok: boolean; plans: PlanSummary[] }>('/api/ariadne/plans')
+      .then((r) => {
+        if (!r.ok) {return}
+        const terminal = new Set(['done', 'partial', 'failed', 'cancelled'])
+
+        const away = r.plans.filter((p) => {
+          // Finished after we last looked, and we were gone for a while.
+          const endedAt = Number(p.updated_at ?? 0) * 1000
+
+          return terminal.has(p.state) && endedAt >= lastSeen && endedAt < now
+        })
+
+        setFinishedAway(
+          away.map((p) => ({ id: p.id, goal: p.goal, state: p.state }))
+        )
+      })
+      .catch(() => {})
+  }, [])
+
+  // Load sessions + poll plans count
+  useEffect(() => {
+      void get<{ ok?: boolean; sessions?: Array<{ id: string; title: string }> }>('/api/sessions')
       .then((r) => setSessions(r.sessions ?? []))
       .catch(() => setSessions([]))
 
@@ -210,6 +254,47 @@ export function App() {
           {/* Chat */}
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <div style={{ flex: 1, overflowY: 'auto', padding: 14 }}>
+              {/* S5: resume banner — plans finished while the app was away */}
+              {finishedAway.length > 0 && (
+                <div
+                  style={{
+                    border: '1px solid #9ece6a',
+                    borderRadius: 8,
+                    padding: 10,
+                    marginBottom: 12,
+                    background: 'color-mix(in srgb, #9ece6a 8%, transparent)'
+                  }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
+                    Plans finished while you were away
+                  </div>
+                  {finishedAway.map((p) => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.goal.slice(0, 80)}
+                      </span>
+                      <span style={{ fontSize: 11, color: '#9ece6a', border: '1px solid #9ece6a', borderRadius: 999, padding: '0 8px' }}>
+                        {p.state}
+                      </span>
+                      <button
+                        onClick={() => openPane('dags')}
+                        style={{
+                          background: 'none',
+                          border: '1px solid var(--border, #2a2a2a)',
+                          borderRadius: 4,
+                          color: 'inherit',
+                          cursor: 'pointer',
+                          fontSize: 11,
+                          padding: '2px 8px',
+                          fontFamily: 'inherit'
+                        }}
+                      >
+                        View results
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               {!sessionId && (
                 <p style={{ color: '#888', fontSize: 13, marginTop: 40, textAlign: 'center' }}>
                   Select a session or start typing below. The composer sends to the Prime worker.
@@ -276,7 +361,6 @@ export function App() {
                   padding: '8px 12px',
                   color: 'inherit',
                   fontSize: 13,
-                  outline: 'none',
                   fontFamily: 'inherit'
                 }}
                 value={input}

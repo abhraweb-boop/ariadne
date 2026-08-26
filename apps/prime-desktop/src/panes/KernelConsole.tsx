@@ -77,7 +77,7 @@ export function KernelConsole({ onClose }: { onClose: () => void }) {
         <div ref={endRef} />
       </div>
       <div style={{ display: 'flex', gap: 8, padding: 10, borderTop: '1px solid var(--border, #2a2a2a)' }}>
-        <input disabled={running} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCell() } }} placeholder="Python code…" style={{ flex: 1, background: 'color-mix(in srgb, var(--foreground, #efefef) 6%, transparent)', border: '1px solid var(--border, #2a2a2a)', borderRadius: 4, padding: '6px 10px', color: 'inherit', fontSize: 12, fontFamily: 'monospace', outline: 'none' }} value={input} />
+        <input disabled={running} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runCell() } }} placeholder="Python code…" style={{ flex: 1, background: 'color-mix(in srgb, var(--foreground, #efefef) 6%, transparent)', border: '1px solid var(--border, #2a2a2a)', borderRadius: 4, padding: '6px 10px', color: 'inherit', fontSize: 12, fontFamily: 'monospace' }} value={input} />
         <button disabled={running} onClick={runCell} style={{ background: running ? '#555' : 'var(--accent, #5e6ad2)', border: 'none', borderRadius: 4, padding: '6px 14px', color: '#fff', cursor: running ? 'default' : 'pointer', fontSize: 12, fontFamily: 'inherit' }}>{running ? 'Running…' : 'Run'}</button>
       </div>
     </div>

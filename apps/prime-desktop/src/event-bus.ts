@@ -1,12 +1,13 @@
 /**
  * Prime Hermes — EventBus (S1: one SSE spine with replay).
  *
- * A single EventSource subscribes to the gateway's unified event stream.
- * On reconnect it sends `Last-Event-ID` so missed transitions are replayed —
+ * A single fetch-based SSE stream subscribes to the gateway's unified event
+ * stream. fetch (not EventSource) so we can attach the session token header.
+ * On reconnect it sends `after_id` so missed transitions are replayed —
  * panes never show stale state after a wake/blip. Panes subscribe by type.
  */
 
-import { gatewayBase } from './api'
+import { gatewayBase, sessionToken } from './api'
 
 export interface BusEvent {
   id: string
@@ -18,13 +19,13 @@ export interface BusEvent {
 type Listener = (ev: BusEvent) => void
 
 const listeners = new Map<string, Set<Listener>>()
-let source: EventSource | null = null
+let controller: AbortController | null = null
 let lastEventId: string | null = null
 let reconnectDelay = 1000
 let started = false
 
 export function startEventBus(): void {
-  if (started) {return}
+  if (started) return
   started = true
   void connect()
 }
@@ -32,41 +33,58 @@ export function startEventBus(): void {
 async function connect(): Promise<void> {
   try {
     const base = await gatewayBase()
+    const token = await sessionToken()
+    if (controller) controller.abort()
+    controller = new AbortController()
+    const headers: Record<string, string> = {}
+    if (token) headers['X-Hermes-Session-Token'] = token
 
-    if (source) {source.close()}
-    source = new EventSource(
-      `${base}/api/prime/events${lastEventId ? `?after_id=${encodeURIComponent(lastEventId)}` : ''}`
+    const res = await fetch(
+      `${base}/api/ariadne/events${lastEventId ? `?after_id=${encodeURIComponent(lastEventId)}` : ''}`,
+      { headers, signal: controller.signal }
     )
+    if (!res.ok || !res.body) throw new Error(`events ${res.status}`)
 
-    source.onmessage = (msg) => {
-      try {
-        const ev = JSON.parse(msg.data) as BusEvent
-        lastEventId = ev.id
-        reconnectDelay = 1000
-        dispatch(ev)
-      } catch {
-        /* malformed frame — ignore */
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const frames = buffer.split('\n\n')
+      buffer = frames.pop() ?? ''
+      for (const frame of frames) {
+        const line = frame.replace(/^data: /, '').trim()
+        if (!line) continue
+        try {
+          const ev = JSON.parse(line) as BusEvent
+          if (ev.id && ev.id !== '_eof') lastEventId = ev.id
+          reconnectDelay = 1000
+          dispatch(ev)
+        } catch {
+          /* malformed frame — ignore */
+        }
       }
     }
-
-    source.onerror = () => {
-      // EventSource auto-reconnects; we just track replay position.
-      if (source) {source.close()}
-      setTimeout(() => void connect(), reconnectDelay)
-      reconnectDelay = Math.min(reconnectDelay * 2, 30_000)
-    }
+    // Stream ended cleanly (heartbeat eof) — reconnect.
+    scheduleReconnect()
   } catch {
-    setTimeout(() => void connect(), reconnectDelay)
+    scheduleReconnect()
   }
+}
+
+function scheduleReconnect(): void {
+  setTimeout(() => void connect(), reconnectDelay)
+  reconnectDelay = Math.min(reconnectDelay * 2, 30_000)
 }
 
 function dispatch(ev: BusEvent): void {
   const set = listeners.get(ev.type)
-
-  if (set) {for (const fn of [...set]) {fn(ev)}}
+  if (set) for (const fn of [...set]) fn(ev)
   const all = listeners.get('*')
-
-  if (all) {for (const fn of [...all]) {fn(ev)}}
+  if (all) for (const fn of [...all]) fn(ev)
 }
 
 export function onEvent(
@@ -74,14 +92,11 @@ export function onEvent(
   fn: Listener
 ): () => void {
   let set = listeners.get(type)
-
   if (!set) {
     set = new Set()
     listeners.set(type, set)
   }
-
   set.add(fn)
-
   return () => {
     set!.delete(fn)
   }

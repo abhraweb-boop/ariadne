@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from hermes_cli.web_routers.ariadne_events import emit, events_after
+from hermes_cli.web_routers.ariadne_events import emit, events_after, wait_for_events
 
 logger = logging.getLogger(__name__)
 
@@ -155,14 +155,34 @@ def retry_task(task_id: str) -> Dict[str, Any]:
 
 
 @router.get("/events")
-def stream_events(after_id: Optional[str] = Query(None)):
-    """SSE endpoint — one unified event stream with replay (S1)."""
+def stream_events(
+    after_id: Optional[str] = Query(None),
+    stream: bool = Query(True, description="If false, returns snapshot only (no live push loop)."),
+):
+    """SSE endpoint — one unified event stream with replay + live push (S1).
+
+    Replays any retained events after ``after_id``, then holds the connection
+    open and pushes new events as they are emitted. Heartbeat every 15s of
+    silence so the client can detect a dead connection.
+    Pass ``?stream=false`` for a one-shot snapshot (testing / one-shot reads).
+    """
 
     def generate():
-        for ev in events_after(after_id):
+        cursor = after_id or None
+        # Replay pass.
+        for ev in events_after(cursor):
             yield f"data: {json.dumps(ev)}\n\n"
-        # In production, this would be a long-poll or a persistent SSE
-        # connection. MVP returns snapshot + a heartbeat marker.
-        yield f"data: {json.dumps({'id': '_eof', 'type': '_heartbeat', 'payload': {}, 'ts': time.time()})}\n\n"
+            cursor = ev["id"]
+        if not stream:
+            return
+        # Live push loop.
+        while True:
+            fresh = wait_for_events(cursor or "0", timeout_s=15.0)
+            if fresh:
+                for ev in fresh:
+                    yield f"data: {json.dumps(ev)}\n\n"
+                    cursor = ev["id"]
+            else:
+                yield f"data: {json.dumps({'id': '_hb', 'type': '_heartbeat', 'payload': {}, 'ts': time.time()})}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")

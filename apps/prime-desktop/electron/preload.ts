@@ -10,6 +10,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('primeHermes', {
   gatewayBase: (): Promise<string> => ipcRenderer.invoke('prime:gateway-base'),
+  sessionToken: (): Promise<string> => ipcRenderer.invoke('prime:session-token'),
   platform: (): Promise<string> => ipcRenderer.invoke('prime:platform'),
   versions: (): Promise<{ electron: string; chrome: string; node: string }> =>
     ipcRenderer.invoke('prime:versions')

@@ -12,6 +12,7 @@ export function GraphLens({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('')
   const [nodes, setNodes] = useState<GraphNode[]>([])
   const [loading, setLoading] = useState(false)
+  const [viewMode, setViewMode] = useState<'graph' | 'list'>('graph')
 
   async function search(q: string) {
     setLoading(true)
@@ -33,12 +34,27 @@ export function GraphLens({ onClose }: { onClose: () => void }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ display: 'flex', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--border, #2a2a2a)', alignItems: 'center' }}>
         <span style={{ fontWeight: 600, fontSize: 13 }}>🕸 Graph Lens</span>
-        <input onChange={(e) => setQuery(e.target.value)} placeholder="Search nodes…" style={{ flex: 1, background: 'color-mix(in srgb, var(--foreground, #efefef) 6%, transparent)', border: '1px solid var(--border, #2a2a2a)', borderRadius: 4, padding: '4px 8px', color: 'inherit', fontSize: 12, fontFamily: 'inherit' }} value={query} />
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}>✕</button>
+                <input onChange={(e) => setQuery(e.target.value)} placeholder="Search nodes…" style={{ flex: 1, background: 'color-mix(in srgb, var(--foreground, #efefef) 6%, transparent)', border: '1px solid var(--border, #2a2a2a)', borderRadius: 4, padding: '4px 8px', color: 'inherit', fontSize: 12, fontFamily: 'inherit' }} value={query} />
+                <button
+                  onClick={() => setViewMode((v) => (v === 'graph' ? 'list' : 'graph'))}
+                  style={{
+                    background: 'none',
+                    border: '1px solid var(--border, #2a2a2a)',
+                    borderRadius: 999,
+                    padding: '2px 10px',
+                    color: 'inherit',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  {viewMode === 'graph' ? '☰ List' : '🕸 Graph'}
+                </button>
+                <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}>✕</button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
         {loading && <p style={{ padding: 20, color: 'var(--muted-foreground, #888)' }}>Loading…</p>}
-        {!loading && laid.nodes.length > 0 && (
+        {!loading && viewMode === 'graph' && laid.nodes.length > 0 && (
           <svg aria-label="Context graph" height={laid.height} role="img" style={{ display: 'block' }} width={laid.width}>
             {laid.nodes.map((n) => {
               const m = metaFor(n.type)
@@ -53,7 +69,36 @@ export function GraphLens({ onClose }: { onClose: () => void }) {
             })}
           </svg>
         )}
-        {!loading && laid.nodes.length === 0 && query && <p style={{ padding: 20, color: 'var(--muted-foreground, #888)' }}>No nodes found.</p>}
+        {!loading && viewMode === 'list' && nodes.length > 0 && (
+          <div style={{ padding: 8 }}>
+            {nodes.map((n) => {
+              const m = metaFor(n.type)
+
+              return (
+                <div
+                  key={n.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '6px 8px',
+                    borderBottom: '1px solid var(--border, #2a2a2a)',
+                    fontSize: 12
+                  }}
+                >
+                  <span style={{ color: m.color }}>{m.glyph}</span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {n.title || n.key}
+                  </span>
+                  <span style={{ color: 'var(--muted-foreground, #888)', fontVariantNumeric: 'tabular-nums' }}>
+                    {n.touches}×
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        {!loading && nodes.length === 0 && query && <p style={{ padding: 20, color: 'var(--muted-foreground, #888)' }}>No nodes found.</p>}
       </div>
     </div>
   )

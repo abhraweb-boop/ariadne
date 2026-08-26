@@ -37,6 +37,12 @@ function resolveGatewayBase(): string {
   return 'http://127.0.0.1:8000'
 }
 
+function resolveSessionToken(): string {
+  // Passed from the environment by whoever launched us; empty means the
+  // gateway is unauthenticated (auth_required=False) and no header is sent.
+  return process.env.HERMES_DASHBOARD_SESSION_TOKEN ?? ''
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -66,9 +72,11 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(() => {
   const gatewayBase = resolveGatewayBase()
+  const sessionToken = resolveSessionToken()
 
   // Typed capability bridge: renderer asks for machine + gateway facts.
   ipcMain.handle('prime:gateway-base', () => gatewayBase)
+  ipcMain.handle('prime:session-token', () => sessionToken)
   ipcMain.handle('prime:platform', () => process.platform)
   ipcMain.handle('prime:versions', () => ({
     electron: process.versions.electron,

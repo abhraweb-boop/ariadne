@@ -10,6 +10,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { get, post } from '../api'
 import { type BusEvent, onEvent } from '../event-bus'
+import { extractSlots, listRecipes, materializeRecipe, type Recipe,
+  saveRecipe
+} from '../recipes'
 
 interface PlanSummary {
   id: string
@@ -46,6 +49,12 @@ export function DagBoard({ onClose }: { onClose: () => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [composerText, setComposerText] = useState('')
   const [running, setRunning] = useState(false)
+  // S4: recipe state
+  const [recipes, setRecipes] = useState<Recipe[]>([])
+  const [recipeName, setRecipeName] = useState('')
+  const [slotValues, setSlotValues] = useState<Record<string, string>>({})
+  const [activeRecipe, setActiveRecipe] = useState<Recipe | null>(null)
+  const [showSlots, setShowSlots] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
 
   // Load plan list
@@ -53,6 +62,59 @@ export function DagBoard({ onClose }: { onClose: () => void }) {
     void get<{ ok: boolean; plans: PlanSummary[] }>('/api/ariadne/plans').then((r) => {
       if (r.ok) {setPlans(r.plans)}
     })
+  }, [])
+
+  // S4: load recipes on mount
+  useEffect(() => {
+    setRecipes(listRecipes())
+  }, [])
+
+  // S4: save current composer text as a recipe
+  const saveAsRecipe = useCallback(() => {
+    const name = recipeName.trim()
+
+    if (!name) {return}
+    const lines = composerText.trim().split('\n').filter(Boolean)
+
+    const tasks = lines.map((line) => ({
+      title: line.replace(/^dep: (\w+): /, '').trim(),
+      kind: 'note' as const,
+      payload: { text: line },
+      depends_on: line.startsWith('dep: ') ? [line.match(/^dep: (\w+)/)![1]] : []
+    }))
+
+    if (tasks.length === 0) {return}
+    saveRecipe(name, composerText.slice(0, 80), tasks)
+    setRecipes(listRecipes())
+    setRecipeName('')
+  }, [composerText, recipeName])
+
+  // S4: begin loading a recipe — detect slots
+  const startRecipe = useCallback((recipe: Recipe) => {
+    setActiveRecipe(recipe)
+    const slots = extractSlots(recipe.tasks)
+
+    if (slots.length > 0) {
+      setSlotValues(Object.fromEntries(slots.map((s) => [s, ''])))
+      setShowSlots(true)
+    } else {
+      // No slots — load directly
+      loadRecipe(recipe, {})
+    }
+  }, [])
+
+  // S4: fill slots and load recipe into composer
+  const confirmSlots = useCallback(() => {
+    if (!activeRecipe) {return}
+    loadRecipe(activeRecipe, slotValues)
+    setShowSlots(false)
+    setActiveRecipe(null)
+  }, [activeRecipe, slotValues])
+
+  const loadRecipe = useCallback((recipe: Recipe, values: Record<string, string>) => {
+    const tasks = materializeRecipe(recipe, values)
+    const text = tasks.map((t) => t.title).join('\n')
+    setComposerText(text)
   }, [])
 
   // Load a plan's tasks
@@ -415,46 +477,187 @@ export function DagBoard({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      {/* Composer (quick-add plan) */}
-      <div
-        style={{
-          borderTop: '1px solid var(--border, #2a2a2a)',
-          padding: 10,
-          display: 'flex',
-          gap: 8
-        }}
-      >
-        <input
-          onChange={(e) => setComposerText(e.target.value)}
-          placeholder="One task per line. dep: task-id: for dependencies."
-          style={{
-            flex: 1,
-            background: 'color-mix(in srgb, var(--foreground, #efefef) 6%, transparent)',
-            border: '1px solid var(--border, #2a2a2a)',
-            borderRadius: 4,
-            padding: '6px 10px',
-            color: 'inherit',
-            fontSize: 12,
-            fontFamily: 'inherit'
-          }}
-          value={composerText}
-        />
-        <button
-          onClick={() => void createPlan()}
-          style={{
-            background: 'var(--accent, #5e6ad2)',
-            border: 'none',
-            borderRadius: 4,
-            padding: '6px 14px',
-            color: '#fff',
-            cursor: 'pointer',
-            fontSize: 12,
-            fontFamily: 'inherit'
-          }}
-        >
-          Create Plan
-        </button>
-      </div>
+      {/* Composer (quick-add plan) + recipe save */}
+            <div
+              style={{
+                borderTop: '1px solid var(--border, #2a2a2a)',
+                padding: 10,
+                display: 'flex',
+                gap: 8,
+                flexDirection: 'column'
+              }}
+            >
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  onChange={(e) => setComposerText(e.target.value)}
+                  placeholder="One task per line. dep: task-id: for dependencies."
+                  style={{
+                    flex: 1,
+                    background: 'color-mix(in srgb, var(--foreground, #efefef) 6%, transparent)',
+                    border: '1px solid var(--border, #2a2a2a)',
+                    borderRadius: 4,
+                    padding: '6px 10px',
+                    color: 'inherit',
+                    fontSize: 12,
+                    fontFamily: 'inherit'
+                  }}
+                  value={composerText}
+                />
+                <button
+                  onClick={() => void createPlan()}
+                  style={{
+                    background: 'var(--accent, #5e6ad2)',
+                    border: 'none',
+                    borderRadius: 4,
+                    padding: '6px 14px',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  Create Plan
+                </button>
+              </div>
+              {/* S4: recipe save row */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  onChange={(e) => setRecipeName(e.target.value)}
+                  placeholder="Recipe name…"
+                  style={{
+                    flex: 1,
+                    background: 'color-mix(in srgb, var(--foreground, #efefef) 6%, transparent)',
+                    border: '1px solid var(--border, #2a2a2a)',
+                    borderRadius: 4,
+                    padding: '4px 8px',
+                    color: 'inherit',
+                    fontSize: 11,
+                    fontFamily: 'inherit'
+                  }}
+                  value={recipeName}
+                />
+                <button
+                  onClick={saveAsRecipe}
+                  style={{
+                    background: 'none',
+                    border: '1px solid var(--border, #2a2a2a)',
+                    borderRadius: 4,
+                    padding: '4px 10px',
+                    color: 'inherit',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  Save as recipe
+                </button>
+              </div>
+              {/* S4: recipe list */}
+              {recipes.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {recipes.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => startRecipe(r)}
+                      style={{
+                        background: 'color-mix(in srgb, var(--foreground, #efefef) 4%, transparent)',
+                        border: '1px solid var(--border, #2a2a2a)',
+                        borderRadius: 999,
+                        padding: '2px 10px',
+                        color: 'inherit',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        fontFamily: 'inherit'
+                      }}
+                      title={r.goal}
+                    >
+                      {r.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* S4 slot-fill dialog */}
+              {showSlots && activeRecipe && (
+                <div
+                  style={{
+                    border: '1px solid #e0af68',
+                    borderRadius: 8,
+                    padding: 10,
+                    background: 'color-mix(in srgb, #e0af68 6%, transparent)'
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                    Fill recipe slots for "{activeRecipe.name}"
+                  </div>
+                  {Object.keys(slotValues).map((slot) => (
+                    <label
+                      key={slot}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginBottom: 4,
+                        fontSize: 12
+                      }}
+                    >
+                      <code style={{ minWidth: 80 }}>{slot}</code>
+                      <input
+                        onChange={(e) =>
+                          setSlotValues((prev) => ({ ...prev, [slot]: e.target.value }))
+                        }
+                        placeholder={`value for ${slot}`}
+                        style={{
+                          flex: 1,
+                          background: 'color-mix(in srgb, var(--foreground, #efefef) 6%, transparent)',
+                          border: '1px solid var(--border, #2a2a2a)',
+                          borderRadius: 4,
+                          padding: '4px 8px',
+                          color: 'inherit',
+                          fontSize: 12,
+                          fontFamily: 'inherit'
+                        }}
+                        value={slotValues[slot]}
+                      />
+                    </label>
+                  ))}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                    <button
+                      onClick={confirmSlots}
+                      style={{
+                        background: 'var(--accent, #5e6ad2)',
+                        border: 'none',
+                        borderRadius: 4,
+                        padding: '4px 12px',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        fontFamily: 'inherit'
+                      }}
+                    >
+                      Load
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowSlots(false)
+                        setActiveRecipe(null)
+                      }}
+                      style={{
+                        background: 'none',
+                        border: '1px solid var(--border, #2a2a2a)',
+                        borderRadius: 4,
+                        padding: '4px 12px',
+                        color: 'inherit',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        fontFamily: 'inherit'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
     </div>
   )
 }

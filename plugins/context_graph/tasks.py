@@ -89,9 +89,12 @@ class TaskStore:
         self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA busy_timeout=2000")
         self._conn.executescript(_SCHEMA)
         self._conn.commit()
         self._lock = threading.RLock()
+        # Cache the shared graph store for mirroring (avoid re-import per task).
+        self._graph_store_cache: Optional[Any] = None
 
     def close(self) -> None:
         try:
@@ -128,11 +131,16 @@ class TaskStore:
                         "pending", int(t["max_attempts"]), now,
                     ),
                 )
+            # Commit BEFORE mirroring: the graph store is a second connection
+            # to the same db (WAL = one writer). Mirroring inside the open
+            # task transaction blocks on our own write lock and each mirror
+            # burns the full busy timeout (~5s each) before failing silently.
+            self._conn.commit()
+            for t in cleaned:
                 # Mirror into the shared context graph so /graph renders it.
                 self._mirror_node(t["id"], t["title"])
                 for dep in t["depends_on"]:
                     self._mirror_edge(dep, t["id"])
-            self._conn.commit()
         return plan_id
 
     def plan(self, plan_id: str) -> Optional[Dict[str, Any]]:
@@ -558,9 +566,12 @@ class TaskStore:
 
     # ── mirror into the shared context graph (/graph rendering) ─────────
     def _graph_store(self):
+        if self._graph_store_cache is not None:
+            return self._graph_store_cache
         from plugins.context_graph import get_store
 
-        return get_store()
+        self._graph_store_cache = get_store()
+        return self._graph_store_cache
 
     def _mirror_node(self, task_id: str, title: str) -> None:
         try:

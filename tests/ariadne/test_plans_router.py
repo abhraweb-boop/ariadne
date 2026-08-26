@@ -161,7 +161,8 @@ def test_events_endpoint_returns_snapshot(_isolate_store):
     client = TestClient(app)
 
     client.post("/api/ariadne/plans", json={"goal": "g", "tasks": [_spec("x")]})
-    r = client.get("/api/ariadne/events")
+    # stream=false: snapshot only, no live push loop (avoids hanging the test)
+    r = client.get("/api/ariadne/events?stream=false")
     assert r.status_code == 200
     assert "text/event-stream" in r.headers["content-type"]
     body = r.text

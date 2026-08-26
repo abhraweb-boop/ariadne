@@ -10,6 +10,7 @@ declare global {
   interface Window {
     primeHermes?: {
       gatewayBase: () => Promise<string>
+      sessionToken: () => Promise<string>
       platform: () => Promise<string>
       versions: () => Promise<{ electron: string; chrome: string; node: string }>
     }
@@ -17,6 +18,17 @@ declare global {
 }
 
 let cachedBase: string | null = null
+let cachedToken: string | null = null
+
+export async function sessionToken(): Promise<string> {
+  if (cachedToken !== null) return cachedToken
+  if (window.primeHermes) {
+    cachedToken = await window.primeHermes.sessionToken()
+  } else {
+    cachedToken = ''
+  }
+  return cachedToken
+}
 
 export async function gatewayBase(): Promise<string> {
   if (cachedBase) {return cachedBase}
@@ -43,6 +55,7 @@ export async function api<T = unknown>(
   opts: ApiOptions = {}
 ): Promise<T> {
   const base = await gatewayBase()
+  const token = await sessionToken()
   const controller = new AbortController()
 
   const timeout = setTimeout(
@@ -51,12 +64,16 @@ export async function api<T = unknown>(
   )
 
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...opts.headers
+    }
+    if (token) {
+      headers['X-Hermes-Session-Token'] = token
+    }
     const res = await fetch(`${base}${path}`, {
       method: opts.method ?? 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...opts.headers
-      },
+      headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
       signal: controller.signal
     })
