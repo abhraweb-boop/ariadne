@@ -19,6 +19,7 @@ import { ErrorBoundary } from './components/error-boundary'
 import { FindBar } from './components/find-bar'
 import { MarkdownText } from './components/markdown-text'
 import { Notifications } from './components/notifications'
+import { SessionRail } from './components/session-rail'
 import { Statusbar } from './components/statusbar'
 import { StreamingCaret } from './components/streaming-caret'
 import { Titlebar } from './components/titlebar'
@@ -72,7 +73,6 @@ export function App() {
   const [tokenCount, setTokenCount] = useState(0)
   const [planCount, setPlanCount] = useState(0)
   const endRef = useRef<HTMLDivElement>(null)
-  const [sessions, setSessions] = useState<Array<{ id: string; title: string }>>([])
   // S5: resume banner
   const [finishedAway, setFinishedAway] = useState<FinishedAwayPlan[]>([])
 
@@ -159,13 +159,8 @@ export function App() {
     return installShortcuts()
   }, [])
 
-  // Load sessions + poll plans count
+  // Poll plans count for statusbar (G2 adds live widgets)
   useEffect(() => {
-      void get<{ ok?: boolean; sessions?: Array<{ id: string; title: string }> }>('/api/sessions')
-      .then((r) => setSessions(r.sessions ?? []))
-      .catch(() => setSessions([]))
-
-    // Poll plans count for statusbar
     const interval = setInterval(() => {
       void get<{ ok: boolean; plans: unknown[] }>('/api/ariadne/plans')
         .then((r) => { if (r.ok) {setPlanCount(r.plans.length)} })
@@ -229,32 +224,11 @@ export function App() {
           <div style={{ padding: '10px 14px', fontWeight: 600, fontSize: 13, opacity: 0.8 }}>
             Prime Hermes
           </div>
-          <div style={{ padding: '4px 14px', fontSize: 11, opacity: 0.5 }}>Sessions</div>
-          {sessions.length === 0 && (
-            <div style={{ padding: '8px 14px', fontSize: 12, opacity: 0.5 }}>
-              {sessions.length === 0 ? 'No sessions found. Start a new one.' : ''}
-            </div>
-          )}
-          {sessions.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setSessionId(s.id)}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '8px 14px',
-                textAlign: 'left',
-                background: sessionId === s.id ? 'var(--accent, #5e6ad2)' : 'transparent',
-                color: '#efefef',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: 13,
-                fontFamily: 'inherit'
-              }}
-            >
-              {s.title || s.id}
-            </button>
-          ))}
+          <SessionRail
+            activeId={sessionId}
+            onNewSession={() => { setSessionId(null); setMessages([]) }}
+            onSelect={(id) => setSessionId(id)}
+          />
           <div style={{ borderTop: '1px solid #2a2a2a', marginTop: 8, paddingTop: 8 }}>
             <div style={{ padding: '4px 14px', fontSize: 11, opacity: 0.5 }}>Panels</div>
             {getPanes().map((pane) => (

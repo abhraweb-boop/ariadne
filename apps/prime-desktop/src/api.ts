@@ -25,12 +25,14 @@ let cachedBase: string | null = null
 let cachedToken: string | null = null
 
 export async function sessionToken(): Promise<string> {
-  if (cachedToken !== null) return cachedToken
+  if (cachedToken !== null) {return cachedToken}
+
   if (window.primeHermes) {
     cachedToken = await window.primeHermes.sessionToken()
   } else {
     cachedToken = ''
   }
+
   return cachedToken
 }
 
@@ -72,9 +74,11 @@ export async function api<T = unknown>(
       'Content-Type': 'application/json',
       ...opts.headers
     }
+
     if (token) {
       headers['X-Hermes-Session-Token'] = token
     }
+
     const res = await fetch(`${base}${path}`, {
       method: opts.method ?? 'GET',
       headers,
@@ -101,4 +105,14 @@ export function post<T = unknown>(path: string, body: unknown): Promise<T> {
 /** GET convenience. */
 export function get<T = unknown>(path: string): Promise<T> {
   return api<T>(path)
+}
+
+/** PATCH convenience. */
+export function patch<T = unknown>(path: string, body: unknown): Promise<T> {
+  return api<T>(path, { method: 'PATCH', body })
+}
+
+/** DELETE convenience. */
+export function del<T = unknown>(path: string): Promise<T> {
+  return api<T>(path, { method: 'DELETE' })
 }
