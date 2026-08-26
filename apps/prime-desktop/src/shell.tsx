@@ -17,6 +17,8 @@ import { registerAllPanes } from './panes/index'
 import { getPanes } from './panes/registry'
 import { Titlebar } from './components/titlebar'
 import { Statusbar } from './components/statusbar'
+import { CommandPalette } from './components/command-palette'
+import { registerCoreActions } from './actions-registry'
 
 // Register all panes once at module load.
 registerAllPanes()
@@ -50,6 +52,7 @@ interface PlanSummary {
 export function App() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [openPaneId, setOpenPaneId] = useState<string | null>(null)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -126,6 +129,26 @@ export function App() {
         )
       })
       .catch(() => {})
+  }, [])
+
+  // A3: register core actions + open palette on Ctrl+K
+  useEffect(() => {
+    registerCoreActions({
+      openPane: (id) => setOpenPaneId(id),
+      newSession: () => {
+        setSessionId(null)
+        setMessages([])
+      }
+    })
+
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setPaletteOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   // Load sessions + poll plans count
@@ -407,6 +430,9 @@ export function App() {
 
       {/* Statusbar (A2 — port of Hermes statusbar-controls; G2 adds prime widgets) */}
       <Statusbar onOpenPane={(id) => setOpenPaneId(id)} />
+
+      {/* Command palette (A3) */}
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
     </div>
   )
 }
