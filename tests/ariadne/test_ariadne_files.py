@@ -63,3 +63,25 @@ def test_read_missing_file_404(client):
 def test_traversal_blocked(client):
     r = client.get("/api/ariadne/files/read", params={"path": "../secret.txt"})
     assert r.status_code == 400
+
+
+def test_prefix_sibling_blocked(tmp_path, monkeypatch):
+    """Prefix-sibling escape: workspace dir 'repo' must not allow 'repo-evil'."""
+    (tmp_path / "repo").mkdir(exist_ok=True)
+    (tmp_path / "repo-evil").mkdir(exist_ok=True)
+    (tmp_path / "repo-evil" / "secret.txt").write_text("secret", encoding="utf-8")
+    (tmp_path / "repo" / "ok.txt").write_text("ok", encoding="utf-8")
+    monkeypatch.chdir(tmp_path / "repo")
+
+    app = FastAPI()
+    app.include_router(ariadne_files.router)
+    c = TestClient(app)
+
+    r = c.get("/api/ariadne/files/read", params={"path": "../repo-evil/secret.txt"})
+    assert r.status_code == 400
+
+
+def test_windows_style_backslash_blocked(client):
+    """Backslash traversal (Windows separator) must be blocked too."""
+    r = client.get("/api/ariadne/files/read", params={"path": "..\\..\\secret.txt"})
+    assert r.status_code == 400

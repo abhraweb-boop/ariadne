@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -25,15 +25,19 @@ def _root() -> Path:
 def _resolve(subpath: str) -> Path:
     root = _root()
     target = (root / subpath.lstrip("/")).resolve()
-    if not str(target).startswith(str(root)):
-        raise HTTPException(400, "path escapes workspace")
+    # Containment via relative_to — correct for prefix-siblings (e.g.
+    # "/workspace" vs "/workspace-evil"), Windows case + backslashes, and
+    # symlink escapes (resolve() follows links before this check).
+    try:
+        target.relative_to(root)
+    except ValueError:
+        raise HTTPException(400, "path escapes workspace") from None
     return target
 
 
 @router.get("/list")
 def list_files(
     path: str = Query("", description="Relative path under the workspace root"),
-    depth: int = Query(1, ge=0, le=3),
 ) -> Dict[str, Any]:
     """List one directory level. Returns entries with type/size/mtime."""
     target = _resolve(path)
