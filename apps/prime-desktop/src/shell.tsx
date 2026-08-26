@@ -15,6 +15,7 @@ import { KernelCellCard, TaskCard, type TaskInfo, ToolCallCard } from './cards'
 import { type BusEvent, onEvent, startEventBus } from './event-bus'
 import { registerAllPanes } from './panes/index'
 import { getPanes } from './panes/registry'
+import { Titlebar } from './components/titlebar'
 
 // Register all panes once at module load.
 registerAllPanes()
@@ -179,6 +180,7 @@ export function App() {
         fontSize: 14
       }}
     >
+      <Titlebar />
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {/* Sessions rail */}
         <nav

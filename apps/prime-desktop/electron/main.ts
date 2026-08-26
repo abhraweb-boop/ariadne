@@ -1,5 +1,5 @@
 /**
- * Prime Hermes — Electron main process (minimal, thin).
+ * Prime Hermes — Electron main process.
  *
  * Owns the machine facts only: window lifecycle, a typed capability bridge
  * to the renderer, and gateway base-URL resolution. All agent capability
@@ -7,11 +7,10 @@
  * fetch/EventSource through the bridge.
  */
 
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-
 import { app, BrowserWindow, ipcMain } from 'electron'
+import { existsSync, readFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -43,14 +42,19 @@ function resolveSessionToken(): string {
   return process.env.HERMES_DASHBOARD_SESSION_TOKEN ?? ''
 }
 
+let win: BrowserWindow | null = null
+
 function createWindow(): BrowserWindow {
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 1280,
     height: 860,
     minWidth: 960,
     minHeight: 600,
     title: 'Prime Hermes',
     backgroundColor: '#101012',
+    // A1: custom titlebar — hidden native frame, renderer draws drag region
+    // + window controls (min/max/close) via the bridge.
+    titleBarStyle: 'hidden',
     webPreferences: {
       preload: join(__dirname, '..', 'dist', 'electron-preload.js'),
       contextIsolation: true,
@@ -66,7 +70,7 @@ function createWindow(): BrowserWindow {
   } else {
     void win.loadFile(join(__dirname, '..', 'dist', 'index.html'))
   }
-
+  win.on('closed', () => { win = null })
   return win
 }
 
@@ -83,6 +87,18 @@ app.whenReady().then(() => {
     chrome: process.versions.chrome,
     node: process.versions.node
   }))
+
+  // A1: window controls for the custom titlebar.
+  ipcMain.handle('prime:window:minimize', () => { win?.minimize() })
+  ipcMain.handle('prime:window:maximize', () => {
+    if (!win) {return}
+    if (win.isMaximized()) {
+      win.unmaximize()
+    } else {
+      win.maximize()
+    }
+  })
+  ipcMain.handle('prime:window:close', () => { win?.close() })
 
   createWindow()
 

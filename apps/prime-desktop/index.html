@@ -8,6 +8,9 @@
       html, body, #root { margin: 0; padding: 0; height: 100%; overflow: hidden; }
       :focus-visible { outline: 2px solid #5e6ad2; outline-offset: 1px; }
       button:focus-visible { outline: 2px solid #5e6ad2; outline-offset: 2px; }
+      /* A1: titlebar drag regions (class-based so tests can assert them) */
+      .ph-drag { -webkit-app-region: drag; }
+      .ph-no-drag { -webkit-app-region: no-drag; }
     </style>
   </head>
   <body>

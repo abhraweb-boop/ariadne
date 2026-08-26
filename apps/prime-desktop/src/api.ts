@@ -13,6 +13,10 @@ declare global {
       sessionToken: () => Promise<string>
       platform: () => Promise<string>
       versions: () => Promise<{ electron: string; chrome: string; node: string }>
+      // A1: window controls
+      windowMinimize?: () => Promise<void>
+      windowMaximize?: () => Promise<void>
+      windowClose?: () => Promise<void>
     }
   }
 }
