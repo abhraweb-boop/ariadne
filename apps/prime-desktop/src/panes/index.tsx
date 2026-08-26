@@ -6,6 +6,7 @@
 import { lazy, Suspense } from 'react'
 
 import { FilesPane } from './FilesPane'
+import { CostBreakdown } from './CostBreakdown'
 import { registerPane } from './registry'
 import { ReviewPane } from './ReviewPane'
 import { TerminalPane } from './TerminalPane'
@@ -87,6 +88,12 @@ export function registerAllPanes() {
     label: 'Terminal',
     icon: '🖥',
     render: (props) => <TerminalPane {...props} />
+  })
+  registerPane({
+    id: 'cost',
+    label: 'Cost',
+    icon: '💸',
+    render: (props) => <CostBreakdown {...props} />
   })
   registerPane({
     id: 'review',

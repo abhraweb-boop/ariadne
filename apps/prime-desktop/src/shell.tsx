@@ -20,6 +20,8 @@ import { FindBar } from './components/find-bar'
 import { MarkdownText } from './components/markdown-text'
 import { Notifications } from './components/notifications'
 import { SessionPicker } from './components/session-picker'
+import { Onboarding } from './components/onboarding'
+import { KernelWidget, MemoryWidget, PlanCountWidget, WorkerWidget } from './components/statusbar-widgets'
 import { SessionRail } from './components/session-rail'
 import { Statusbar } from './components/statusbar'
 import { StreamingCaret } from './components/streaming-caret'
@@ -73,6 +75,7 @@ export function App() {
   const [findOpen, setFindOpen] = useState(false)
   const [findQuery, setFindQuery] = useState('')
   const [activeFind, setActiveFind] = useState<{ messageIndex: number; textIndex: number } | null>(null)
+  const [onboardingOpen, setOnboardingOpen] = useState(true)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -436,7 +439,17 @@ export function App() {
       </div>
 
       {/* Statusbar (A2 — port of Hermes statusbar-controls; G2 adds prime widgets) */}
-      <Statusbar onOpenPane={(id) => setOpenPaneId(id)} />
+      <Statusbar
+        onOpenPane={(id) => setOpenPaneId(id)}
+        widgets={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <KernelWidget onOpen={() => setOpenPaneId('kernel')} />
+            <PlanCountWidget onOpen={() => setOpenPaneId('dags')} />
+            <WorkerWidget onOpen={() => setOpenPaneId('agents')} />
+            <MemoryWidget onOpen={() => setOpenPaneId('ledger')} />
+          </div>
+        }
+      />
 
       {/* Command palette (A3) */}
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
@@ -444,10 +457,13 @@ export function App() {
       {/* Session picker (C2) */}
       {pickerOpen && (
         <SessionPicker
-          onClose={() => setPickerOpen(false)}
           onSelect={(id) => setSessionId(id)}
+          onClose={() => setPickerOpen(false)}
         />
       )}
+
+      {/* First-run onboarding (F2) */}
+      {onboardingOpen && <Onboarding onClose={() => setOnboardingOpen(false)} />}
     </div>
   )
 }

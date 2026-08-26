@@ -18,7 +18,14 @@ export interface StatusbarItem {
   onClick?: () => void
 }
 
-export function Statusbar({ onOpenPane }: { onOpenPane?: (id: string) => void }) {
+export function Statusbar({
+  onOpenPane,
+  widgets
+}: {
+  onOpenPane?: (id: string) => void
+  /** G2: live widgets rendered in the right cluster. */
+  widgets?: React.ReactNode
+}) {
   const [model, setModel] = useState('gpt-4o-mini')
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -156,8 +163,8 @@ export function Statusbar({ onOpenPane }: { onOpenPane?: (id: string) => void })
       </div>
 
       {/* Right cluster: version + prime-specific widgets */}
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-        {/* G2 targets: kernel dot, plan count, worker state — added here */}
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+        {widgets}
         <span style={{ fontSize: 10, opacity: 0.5 }}>Prime Hermes v0.1.0</span>
       </div>
     </div>
