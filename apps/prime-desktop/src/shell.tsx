@@ -79,9 +79,6 @@ export function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [primeState, setPrimeState] = useState<string>('idle')
-  const [tokenCount, setTokenCount] = useState(0)
-  const [planCount, setPlanCount] = useState(0)
   const endRef = useRef<HTMLDivElement>(null)
   const sessionIdRef = useRef<string | null>(null)
   // Keep ref in sync with sessionId
@@ -111,11 +108,6 @@ export function App() {
         setSending(false)
         setMessages((prev) => streamReducer(prev, { type: 'finalize' }))
       }
-
-      // Update prime state badge
-      if (typ === 'prime.spawned') {setPrimeState('running')}
-
-      if (typ === 'prime.stopped') {setPrimeState('stopped')}
     })
 
     return () => unsubPrime()
@@ -189,17 +181,6 @@ export function App() {
     })
 
     return installShortcuts()
-  }, [])
-
-  // Poll plans count for statusbar (G2 adds live widgets)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      void get<{ ok: boolean; plans: unknown[] }>('/api/ariadne/plans')
-        .then((r) => { if (r.ok) {setPlanCount(r.plans.length)} })
-        .catch(() => {})
-    }, 10000)
-
-    return () => clearInterval(interval)
   }, [])
 
   // Auto-scroll

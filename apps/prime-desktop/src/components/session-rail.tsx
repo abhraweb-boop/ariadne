@@ -22,7 +22,6 @@ export function SessionRail({
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
-  const [renameValue, setRenameValue] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
 
   const refresh = useCallback(() => {
@@ -194,7 +193,7 @@ export function SessionRail({
               }}
             >
               <button
-                onClick={() => { setMenuFor(null); setRenaming(s.id); setRenameValue(s.title || s.id) }}
+                onClick={() => { setMenuFor(null); setRenaming(s.id) }}
                 style={menuItemStyle}
               >
                 ✏️ Rename
@@ -209,7 +208,6 @@ export function SessionRail({
           )}
         </div>
       ))}
-      <span style={{ display: 'none' }}>{renameValue}</span>
     </div>
   )
 }
