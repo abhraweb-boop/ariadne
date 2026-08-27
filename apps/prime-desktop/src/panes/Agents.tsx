@@ -3,12 +3,29 @@
  * Visual tree with expandable nodes, state badges, steer/abort buttons.
  */
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { get } from '../api'
 
 export function Agents({ onClose }: { onClose: () => void }) {
   const [primeState, setPrimeState] = useState<Record<string, unknown> | null>(null)
+  const [primeRunning, setPrimeRunning] = useState(false)
+
+  const loadPrimeRunning = useCallback(async () => {
+    try {
+      const r = await get<{ ok?: boolean; running?: boolean }>('/api/ariadne/prime/state')
+      setPrimeRunning(!!r.running)
+    } catch {
+      /* bridge unavailable — stay in stopped state */
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadPrimeRunning()
+    const interval = setInterval(() => void loadPrimeRunning(), 30000)
+
+    return () => clearInterval(interval)
+  }, [loadPrimeRunning])
 
   useEffect(() => {
     void get<{ ok: boolean; state: Record<string, unknown> }>('/api/prime/state')
@@ -27,7 +44,11 @@ export function Agents({ onClose }: { onClose: () => void }) {
   return (
     <div style={{ padding: 12, fontSize: 13 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontWeight: 600 }}>👾 Agents</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontWeight: 600 }}>👾 Agents</span>
+          <span style={{ width: 8, height: 8, borderRadius: 4, background: primeRunning ? '#9ece6a' : 'var(--muted-foreground, #888)' }} />
+          <span style={{ fontSize: 11, color: 'var(--muted-foreground, #888)' }}>{primeRunning ? 'prime live' : 'prime stopped'}</span>
+        </span>
         <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}></button>
       </div>
       <div style={{ border: '1px solid var(--border, #2a2a2a)', borderRadius: 8, padding: 12 }}>
