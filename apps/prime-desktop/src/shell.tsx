@@ -404,7 +404,7 @@ export function App() {
                     background:
                       m.role === 'user'
                         ? 'color-mix(in srgb, var(--accent, #5e6ad2) 15%, transparent)'
-                        : 'color-mix(in srgb, #efefef 5%, transparent)',
+                        : 'color-mix(in srgb, var(--foreground, #efefef) 5%, transparent)',
                     maxWidth: '85%',
                     alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start'
                   }}

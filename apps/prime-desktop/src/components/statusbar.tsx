@@ -138,7 +138,7 @@ export function Statusbar({
                   bottom: '100%',
                   left: 0,
                   marginBottom: 4,
-                  background: '#1a1a1a',
+                  background: 'var(--theme-mix-card, #1a1a1a)',
                   border: '1px solid var(--border, #2a2a2a)',
                   borderRadius: 6,
                   padding: '4px 0',

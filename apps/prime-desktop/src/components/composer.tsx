@@ -107,7 +107,7 @@ export function Composer({
           display: 'flex',
           gap: 8,
           padding: '10px 14px',
-          borderTop: '1px solid #2a2a2a'
+          borderTop: '1px solid var(--border, #2a2a2a)'
         }}
       >
         <textarea
@@ -120,8 +120,8 @@ export function Composer({
           style={{
             flex: 1,
             resize: 'none',
-            background: 'color-mix(in srgb, #efefef 6%, transparent)',
-            border: '1px solid #2a2a2a',
+            background: 'color-mix(in srgb, var(--foreground, #efefef) 6%, transparent)',
+            border: '1px solid var(--border, #2a2a2a)',
             borderRadius: 6,
             padding: '8px 12px',
             color: 'inherit',
