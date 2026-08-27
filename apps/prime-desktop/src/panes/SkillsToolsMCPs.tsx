@@ -30,7 +30,7 @@ export function SkillsToolsMCPs({
     void get<{ ok?: boolean; skills?: SkillItem[]; data?: SkillItem[] }>('/api/skills')
       .then((r) => setSkills(r.skills ?? r.data ?? []))
       .catch(() => setError('capability endpoints unavailable'))
-    void get<{ ok?: boolean; tools?: ToolItem[]; data?: ToolItem[] }>('/api/tools/toolsets')
+    void get<{ ok?: boolean; toolsets?: ToolItem[]; data?: ToolItem[] }>('/api/tools/toolsets')
       .then((r) => setTools(r.toolsets ?? r.data ?? []))
       .catch(() => {})
     void get<{ ok?: boolean; servers?: McpItem[]; data?: McpItem[] }>('/api/mcp/servers')

@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { get, post } from '../api'
+import { usePrimeState } from '../hooks/use-prime-state'
 
 interface HealEvent {
   id?: string
@@ -29,8 +30,6 @@ export function SelfImprovePane({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const [refineGoal, setRefineGoal] = useState('')
   const [refineMsg, setRefineMsg] = useState<string | null>(null)
-  const [running, setRunning] = useState(false)
-  const [primeState, setPrimeState] = useState<PrimeState | null>(null)
 
   const loadHeals = useCallback(async () => {
     setLoading(true)
@@ -46,20 +45,12 @@ export function SelfImprovePane({ onClose }: { onClose: () => void }) {
     }
   }, [])
 
-  const loadPrimeState = useCallback(async () => {
-    try {
-      const r = await get<{ ok?: boolean; running?: boolean; state?: PrimeState | null }>('/api/ariadne/prime/state')
-      setRunning(!!r.running)
-      setPrimeState(r.state ?? null)
-    } catch {
-      /* bridge unavailable — stay in stopped state */
-    }
-  }, [])
+  const { running, state: primeState, refresh } = usePrimeState(30000)
 
   useEffect(() => {
     void loadHeals()
-    void loadPrimeState()
-  }, [loadHeals, loadPrimeState])
+    void refresh()
+  }, [loadHeals, refresh])
 
   const refine = useCallback(async () => {
     if (!refineGoal.trim()) {return}
@@ -78,9 +69,9 @@ export function SelfImprovePane({ onClose }: { onClose: () => void }) {
     } catch (e) {
       setRefineMsg(`Failed: ${String(e)}`)
     } finally {
-      void loadPrimeState()
+      void refresh()
     }
-  }, [refineGoal, loadPrimeState])
+  }, [refineGoal, refresh])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
