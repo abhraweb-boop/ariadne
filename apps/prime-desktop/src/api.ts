@@ -20,6 +20,10 @@ declare global {
       // P2: embedded gateway control
       gatewayStatus?: () => Promise<{ healthy: boolean; spawned: boolean; base: string }>
       gatewayRestart?: () => Promise<{ ok: boolean }>
+      // P4: auto-update
+      updateCheck?: () => Promise<{ available: boolean; version: string; error?: string }>
+      updateDownload?: () => Promise<{ ok: boolean; error?: string }>
+      updateInstall?: () => Promise<{ ok: boolean }>
     }
   }
 }

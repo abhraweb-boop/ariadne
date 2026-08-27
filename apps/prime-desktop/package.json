@@ -21,6 +21,7 @@
   "dist:win:nsis": "npm run build && npm run builder -- --win nsis"
  },
  "dependencies": {
+  "electron-updater": "^6.8.9",
   "react": "^19.1.0",
   "react-dom": "^19.1.0",
   "react-markdown": "^10.1.0"
@@ -92,6 +93,12 @@
      "**/*"
     ]
    }
-  ]
+  ],
+  "publish": {
+   "provider": "github",
+   "owner": "abhraweb-boop",
+   "repo": "prime-hermes-desktop",
+   "releaseType": "release"
+  }
  }
 }

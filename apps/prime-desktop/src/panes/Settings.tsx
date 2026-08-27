@@ -22,12 +22,66 @@ export function Settings({ onClose }: { onClose: () => void }) {
   // P2: embedded gateway state
   const [gatewayStatus, setGatewayStatus] = useState<'healthy' | 'connecting' | 'offline'>('connecting')
   const [restarting, setRestarting] = useState(false)
+  // P4: update state
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [downloadingUpdate, setDownloadingUpdate] = useState(false)
+  const [updateMsg, setUpdateMsg] = useState<string | null>(null)
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [updateVersion, setUpdateVersion] = useState('')
+
+  const checkUpdate = useCallback(async () => {
+    if (!window.primeHermes?.updateCheck) {
+      setUpdateMsg('Updates available in the packaged app.')
+
+      return
+    }
+
+    setCheckingUpdate(true)
+    setUpdateMsg(null)
+
+    try {
+      const r = await window.primeHermes.updateCheck()
+
+      if (r.available) {
+        setUpdateAvailable(true)
+        setUpdateVersion(r.version)
+        setUpdateMsg(`Update v${r.version} available.`)
+      } else if (r.error) {
+        setUpdateMsg(`Failed: ${r.error}`)
+      } else {
+        setUpdateMsg('You’re on the latest version.')
+      }
+    } catch (e) {
+      setUpdateMsg(`Failed: ${String(e)}`)
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }, [])
+
+  const downloadUpdate = useCallback(async () => {
+    if (!window.primeHermes?.updateDownload) {return}
+    setDownloadingUpdate(true)
+    setUpdateMsg('Downloading…')
+
+    try {
+      const r = await window.primeHermes.updateDownload()
+      setUpdateMsg(r.ok ? 'Downloaded — ready to install.' : `Failed: ${r.error ?? ''}`)
+    } finally {
+      setDownloadingUpdate(false)
+    }
+  }, [])
+
+  const installUpdate = useCallback(() => {
+    void window.primeHermes?.updateInstall?.()
+  }, [])
 
   const checkGateway = useCallback(async () => {
     if (!window.primeHermes?.gatewayStatus) {
       setGatewayStatus('healthy') // browser dev fallback: assume reachable
+
       return
     }
+
     try {
       const st = await window.primeHermes.gatewayStatus()
       setGatewayStatus(st.healthy ? 'healthy' : 'offline')
@@ -40,6 +94,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
     if (!window.primeHermes?.gatewayRestart) {return}
     setRestarting(true)
     setGatewayStatus('connecting')
+
     try {
       await window.primeHermes.gatewayRestart()
       // give it a moment, then re-probe
@@ -54,6 +109,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
     void gatewayBase().then(setBase)
     void checkGateway()
     const poll = setInterval(() => void checkGateway(), 15_000)
+
     return () => clearInterval(poll)
 
     try {
@@ -115,8 +171,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </span>
         {gatewayStatus === 'offline' && (
           <button
-            onClick={restartGateway}
             disabled={restarting}
+            onClick={restartGateway}
             style={ghostBtn}
           >
             {restarting ? 'Restarting…' : 'Restart gateway'}
@@ -124,6 +180,29 @@ export function Settings({ onClose }: { onClose: () => void }) {
         )}
         {gatewayStatus !== 'offline' && (
           <button onClick={() => void checkGateway()} style={ghostBtn}>↻ check</button>
+        )}
+      </div>
+
+      {/* P4: Auto-update */}
+      <div style={{ fontSize: 11, color: 'var(--muted-foreground, #888)', marginBottom: 6 }}>
+        Updates (P4) — GitHub Releases channel
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+        <button disabled={checkingUpdate} onClick={() => void checkUpdate()} style={ghostBtn}>
+          {checkingUpdate ? 'Checking…' : 'Check for updates'}
+        </button>
+        {updateMsg && (
+          <span style={{ fontSize: 11, color: updateMsg.startsWith('Failed') ? '#f7768e' : 'var(--muted-foreground, #888)' }}>
+            {updateMsg}
+          </span>
+        )}
+        {updateAvailable && (
+          <>
+            <button disabled={downloadingUpdate} onClick={() => void downloadUpdate()} style={ghostBtn}>
+              {downloadingUpdate ? 'Downloading…' : 'Download v' + updateVersion}
+            </button>
+            <button onClick={() => void installUpdate()} style={ghostBtn}>Install & restart</button>
+          </>
         )}
       </div>
 

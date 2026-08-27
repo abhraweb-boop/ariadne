@@ -7,7 +7,7 @@
 
 import type { CSSProperties } from 'react'
 
-export const TITLEBAR_HEIGHT = 34
+export const TITLEBAR_HEIGHT = 30
 
 export const DRAG_CLASS = 'ph-drag'
 export const NO_DRAG_CLASS = 'ph-no-drag'

@@ -24,22 +24,30 @@ export function Titlebar() {
         height: TITLEBAR_HEIGHT,
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
-        padding: '0 8px 0 14px',
+        gap: 0,
+        padding: '0 4px',
         borderBottom: '1px solid var(--border, #2a2a2a)',
         background: 'var(--background, #101012)',
         userSelect: 'none',
         flexShrink: 0
       }}
     >
-      {/* Brand mark (A1) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+      {/* Brand mark (A1) — Hermes look: compact 24px cluster */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '0 10px',
+          height: 24
+        }}
+      >
         <span
           aria-hidden
           style={{
-            width: 16,
-            height: 16,
-            borderRadius: 4,
+            width: 14,
+            height: 14,
+            borderRadius: 3,
             background: 'linear-gradient(135deg, #5e6ad2, #9ece6a)',
             display: 'inline-block',
             flexShrink: 0
@@ -47,27 +55,25 @@ export function Titlebar() {
         />
         <span
           style={{
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 600,
-            color: 'var(--foreground, #efefef)',
+            color: 'var(--muted-foreground, #888)',
             letterSpacing: 0.3,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
+            whiteSpace: 'nowrap'
           }}
         >
           Prime Hermes
         </span>
       </div>
 
-      {/* Window controls (A1) — no-drag */}
+      {/* Window controls (A1) — Hermes look: 24px abutting buttons */}
       <div
         className={NO_DRAG_CLASS}
         style={{
           marginLeft: 'auto',
           display: 'flex',
           alignItems: 'center',
-          gap: 2
+          gap: 0
         }}
       >
         {[
@@ -91,17 +97,17 @@ export function Titlebar() {
               e.currentTarget.style.color = 'var(--muted-foreground, #888)'
             }}
             style={{
-              width: 40,
-              height: 28,
+              width: 28,
+              height: 24,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               background: 'transparent',
               border: 'none',
-              borderRadius: 4,
+              borderRadius: 0,
               color: btn.danger ? 'var(--muted-foreground, #888)' : 'var(--muted-foreground, #888)',
               cursor: 'pointer',
-              fontSize: 12,
+              fontSize: 11,
               fontFamily: 'inherit',
               lineHeight: 1
             }}

@@ -24,4 +24,11 @@ contextBridge.exposeInMainWorld('primeHermes', {
   gatewayStatus: (): Promise<{ healthy: boolean; spawned: boolean; base: string }> =>
     ipcRenderer.invoke('prime:gateway-status'),
   gatewayRestart: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('prime:gateway-restart'),
+
+  // P4: auto-update
+  updateCheck: (): Promise<{ available: boolean; version: string; error?: string }> =>
+    ipcRenderer.invoke('prime:update:check'),
+  updateDownload: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('prime:update:download'),
+  updateInstall: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('prime:update:install'),
 })

@@ -76,25 +76,34 @@ export function SessionRail({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
-      <div style={{ display: 'flex', alignItems: 'center', padding: '4px 14px' }}>
-        <span style={{ fontSize: 11, opacity: 0.5, flex: 1 }}>Sessions</span>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '6px 14px 4px' }}>
+        <span style={{
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: 0.6,
+          textTransform: 'uppercase',
+          color: 'var(--muted-foreground, #888)',
+          flex: 1
+        }}>
+          Sessions
+        </span>
         <button
           aria-label="New session"
           onClick={() => void handleCreate()}
           style={{
             background: 'transparent',
-            border: '1px solid var(--border, #2a2a2a)',
+            border: 'none',
             borderRadius: 4,
-            color: 'var(--foreground, #efefef)',
+            color: 'var(--muted-foreground, #888)',
             cursor: 'pointer',
-            fontSize: 11,
+            fontSize: 12,
             lineHeight: 1,
             padding: '2px 6px',
             fontFamily: 'inherit'
           }}
           title="New session"
         >
-          + New
+          +
         </button>
       </div>
 

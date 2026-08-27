@@ -10,12 +10,14 @@
  * zero manual setup.
  */
 
-import { app, BrowserWindow, ipcMain } from 'electron'
-import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { type ChildProcess, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { app, BrowserWindow, ipcMain } from 'electron'
+import { autoUpdater } from 'electron-updater'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -59,6 +61,7 @@ function runtimeDir(): string | null {
     join(__dirname, '..', 'resources', 'runtime'),
     join(__dirname, '..', '..', 'resources', 'runtime')
   ]
+
   return candidates.find((c) => existsSync(join(c, 'hermes.exe'))) ?? null
 }
 
@@ -68,6 +71,7 @@ async function gatewayHealthy(base: string, token: string): Promise<boolean> {
       signal: AbortSignal.timeout(1500),
       headers: token ? { 'X-Hermes-Session-Token': token } : {}
     })
+
     return res.ok
   } catch {
     return false
@@ -81,10 +85,12 @@ async function gatewayHealthy(base: string, token: string): Promise<boolean> {
 function spawnGateway(base: string, token: string): ChildProcess {
   const runtime = runtimeDir()
   const exe = runtime ? join(runtime, 'hermes.exe') : 'hermes'
+
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     HERMES_DASHBOARD_SESSION_TOKEN: token
   }
+
   // A freshly generated token only makes sense if the gateway requires auth;
   // when it doesn't, the header is ignored server-side. We always pass one so
   // a future auth-enabled runtime works out of the box.
@@ -94,6 +100,7 @@ function spawnGateway(base: string, token: string): ChildProcess {
 
   proc.on('exit', (code) => {
     gatewayProc = null
+
     if (shuttingDown) {return}
     // Backoff: 1s, 2s, 4s … cap at 30s; give up after 3 rapid crashes so the
     // window can show an honest "gateway failed" state instead of a busy loop.
@@ -102,6 +109,7 @@ function spawnGateway(base: string, token: string): ChildProcess {
       if (!shuttingDown) {spawnGateway(base, token)}
     }, delay)
   })
+
   return proc
 }
 
@@ -109,10 +117,12 @@ function spawnGateway(base: string, token: string): ChildProcess {
 async function ensureGateway(base: string, token: string): Promise<{ base: string; token: string; spawned: boolean }> {
   if (await gatewayHealthy(base, token)) {
     gatewayCrashes = 0
+
     return { base, token, spawned: false }
   }
 
   const runtime = runtimeDir()
+
   if (!runtime && process.env.PRIME_NO_EMBEDDED_GATEWAY !== '1') {
     // Dev: no bundled runtime — let the user run their own gateway; the app
     // still works (offline states) and connects once one appears.
@@ -123,13 +133,17 @@ async function ensureGateway(base: string, token: string): Promise<{ base: strin
 
   // Wait for health: up to 30s, polling every 500ms.
   const deadline = Date.now() + 30_000
+
   while (Date.now() < deadline) {
     if (await gatewayHealthy(base, token)) {
       gatewayCrashes = 0
+
       return { base, token, spawned: true }
     }
+
     await new Promise((r) => setTimeout(r, 500))
   }
+
   return { base, token, spawned: true } // child alive but not yet healthy — renderer shows connecting
 }
 
@@ -163,7 +177,9 @@ function createWindow(): BrowserWindow {
   } else {
     void win.loadFile(join(__dirname, '..', 'dist', 'index.html'))
   }
+
   win.on('closed', () => { win = null })
+
   return win
 }
 
@@ -192,7 +208,9 @@ app.whenReady().then(async () => {
       gatewayProc.kill()
       gatewayProc = null
     }
+
     await ensureGateway(gateway.base, gateway.token)
+
     return { ok: true }
   })
 
@@ -200,6 +218,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('prime:window:minimize', () => { win?.minimize() })
   ipcMain.handle('prime:window:maximize', () => {
     if (!win) {return}
+
     if (win.isMaximized()) {
       win.unmaximize()
     } else {
@@ -207,6 +226,34 @@ app.whenReady().then(async () => {
     }
   })
   ipcMain.handle('prime:window:close', () => { win?.close() })
+
+  // P4: auto-update (channel: GitHub Releases; publish later configured in
+  // electron-builder "publish" — latest.yml is produced by the builder).
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = true
+  ipcMain.handle('prime:update:check', async () => {
+    try {
+      const result = await autoUpdater.checkForUpdates()
+
+      return { available: !!result?.updateInfo?.version, version: result?.updateInfo?.version ?? '' }
+    } catch (e) {
+      return { available: false, version: '', error: String(e) }
+    }
+  })
+  ipcMain.handle('prime:update:download', async () => {
+    try {
+      await autoUpdater.downloadUpdate()
+
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: String(e) }
+    }
+  })
+  ipcMain.handle('prime:update:install', () => {
+    autoUpdater.quitAndInstall()
+
+    return { ok: true }
+  })
 
   createWindow()
 
@@ -217,6 +264,7 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   shuttingDown = true
+
   if (gatewayProc) {
     gatewayProc.kill()
     gatewayProc = null

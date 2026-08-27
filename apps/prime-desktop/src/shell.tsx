@@ -194,6 +194,45 @@ export function App() {
         })
       }
     })
+    // R1: remaining Hermes keybind set
+    registerShortcut({
+      id: 'session:new',
+      label: 'New session',
+      combo: 'Ctrl+N',
+      handler: () => {
+        if (overlaysRef.current.paletteOpen || overlaysRef.current.pickerOpen) {return}
+        setSessionId(null)
+        setMessages([])
+      }
+    })
+    registerShortcut({
+      id: 'session:close',
+      label: 'Clear session',
+      combo: 'Ctrl+Shift+N',
+      handler: () => {
+        setSessionId(null)
+        setMessages([])
+      }
+    })
+    registerShortcut({
+      id: 'overlay:close',
+      label: 'Close overlay',
+      combo: 'Escape',
+      handler: () => {
+        if (overlaysRef.current.pickerOpen) {setPickerOpen(false)}
+        else if (overlaysRef.current.paletteOpen) {setPaletteOpen(false)}
+        else if (overlaysRef.current.findOpen) {setFindOpen(false)}
+        else {setOpenPaneId(null)}
+      }
+    })
+    registerShortcut({
+      id: 'panes:toggle',
+      label: 'Toggle last pane',
+      combo: 'Ctrl+\\',
+      handler: () => {
+        setOpenPaneId((cur) => (cur ? null : 'kernel'))
+      }
+    })
 
     return installShortcuts()
   }, [])
@@ -258,7 +297,16 @@ export function App() {
             onSelect={(id) => setSessionId(id)}
           />
           <div style={{ borderTop: '1px solid var(--border, #2a2a2a)', marginTop: 8, paddingTop: 8 }}>
-            <div style={{ padding: '4px 14px', fontSize: 11, opacity: 0.5 }}>Panels</div>
+            <div style={{
+              padding: '4px 14px',
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: 0.6,
+              textTransform: 'uppercase',
+              color: 'var(--muted-foreground, #888)'
+            }}>
+              Panels
+            </div>
             {getPanes().map((pane) => (
               <button
                 key={pane.id}
