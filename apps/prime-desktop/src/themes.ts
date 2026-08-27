@@ -30,20 +30,6 @@ export const DEFAULT_PREFS: ThemePrefs = {
   fontScale: 1
 }
 
-const LIGHT_TOKENS: Record<string, string> = {
-  '--background': '#f5f5f7',
-  '--foreground': '#1c1c1e',
-  '--border': '#d4d4d8',
-  '--muted-foreground': '#6b6b70'
-}
-
-const DARK_TOKENS: Record<string, string> = {
-  '--background': '#101012',
-  '--foreground': '#efefef',
-  '--border': '#2a2a2a',
-  '--muted-foreground': '#888'
-}
-
 export function loadPrefs(): ThemePrefs {
   try {
     const raw = localStorage.getItem(THEME_STORAGE_KEY)
@@ -68,13 +54,12 @@ export function savePrefs(prefs: ThemePrefs): void {
 /** Apply prefs to the document root; idempotent. */
 export function applyTheme(prefs: ThemePrefs): void {
   const root = document.documentElement
+  // V: Hermes token layer — `:root` is light by default, `.dark` toggles dark.
+  root.classList.toggle('dark', prefs.mode === 'dark')
   root.setAttribute('data-theme', prefs.mode)
-  const tokens = prefs.mode === 'light' ? LIGHT_TOKENS : DARK_TOKENS
-
-  for (const [k, v] of Object.entries(tokens)) {
-    root.style.setProperty(k, v)
-  }
-
+  // Accent override: Hermes uses --theme-primary as the accent seed.
+  root.style.setProperty('--theme-primary', ACCENTS[prefs.accent])
+  root.style.setProperty('--theme-midground', ACCENTS[prefs.accent])
   root.style.setProperty('--accent', ACCENTS[prefs.accent])
   root.style.fontSize = `${prefs.fontScale * 14}px`
 }

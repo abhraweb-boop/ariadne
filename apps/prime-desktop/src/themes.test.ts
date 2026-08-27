@@ -33,14 +33,16 @@ describe('theme engine', () => {
     applyTheme({ mode: 'dark', accent: 'indigo', fontScale: 1 })
     const root = document.documentElement
     expect(root.getAttribute('data-theme')).toBe('dark')
+    expect(root.classList.contains('dark')).toBe(true)
     expect(root.style.getPropertyValue('--accent')).toBe(ACCENTS.indigo)
+    expect(root.style.getPropertyValue('--theme-primary')).toBe(ACCENTS.indigo)
   })
 
   it('applies light tokens', () => {
     applyTheme({ mode: 'light', accent: 'rose', fontScale: 1 })
     const root = document.documentElement
     expect(root.getAttribute('data-theme')).toBe('light')
-    expect(root.style.getPropertyValue('--background')).toBe('#f5f5f7')
+    expect(root.classList.contains('dark')).toBe(false)
     expect(root.style.getPropertyValue('--accent')).toBe(ACCENTS.rose)
   })
 
