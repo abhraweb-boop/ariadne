@@ -1,96 +1,106 @@
 /**
- * Skills · Tools · MCPs pane — thin renderers over existing Hermes routers.
- * List + status + detail; point-and-click only.
+ * H1 — Capabilities hub (formerly the combined Skills · Tools · MCPs pane).
+ *
+ * Re-purposed: no longer duplicates the dedicated panes. Shows live counts
+ * and status, and deep-links into the dedicated panes (skills-hub / mcp /
+ * tools) via onOpenPane.
  */
 
 import { useEffect, useState } from 'react'
 
 import { get } from '../api'
 
-interface SkillItem { id: string; name: string; description?: string }
+interface SkillItem { name: string; description?: string }
 interface ToolItem { name: string; description?: string; toolset?: string }
 interface McpItem { name: string; status?: string }
 
-export function SkillsToolsMCPs({ onClose }: { onClose: () => void }) {
+export function SkillsToolsMCPs({
+  onClose,
+  onOpenPane
+}: {
+  onClose: () => void
+  onOpenPane?: (id: string) => void
+}) {
   const [skills, setSkills] = useState<SkillItem[]>([])
   const [tools, setTools] = useState<ToolItem[]>([])
   const [mcps, setMcps] = useState<McpItem[]>([])
   const [error, setError] = useState('')
-  const [tab, setTab] = useState<'skills' | 'tools' | 'mcps'>('skills')
 
   useEffect(() => {
     void get<{ ok?: boolean; skills?: SkillItem[]; data?: SkillItem[] }>('/api/skills')
       .then((r) => setSkills(r.skills ?? r.data ?? []))
-      .catch(() => setError('skills endpoint unavailable'))
-    void get<{ ok?: boolean; tools?: ToolItem[]; data?: ToolItem[] }>('/api/tools')
-      .then((r) => setTools(r.tools ?? r.data ?? []))
+      .catch(() => setError('capability endpoints unavailable'))
+    void get<{ ok?: boolean; tools?: ToolItem[]; data?: ToolItem[] }>('/api/tools/toolsets')
+      .then((r) => setTools(r.toolsets ?? r.data ?? []))
       .catch(() => {})
     void get<{ ok?: boolean; servers?: McpItem[]; data?: McpItem[] }>('/api/mcp/servers')
       .then((r) => setMcps(r.servers ?? r.data ?? []))
       .catch(() => {})
   }, [])
 
+  const row = (id: string, icon: string, label: string, count: number, hint: string) => (
+    <button
+      aria-label={`Open ${label}`}
+      key={id}
+      onClick={() => onOpenPane?.(id)}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'color-mix(in srgb, var(--foreground, #efefef) 8%, transparent)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        width: '100%',
+        padding: '10px 12px',
+        background: 'transparent',
+        border: 'none',
+        borderBottom: '1px solid var(--border, #2a2a2a)',
+        color: 'var(--foreground, #efefef)',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        fontSize: 12,
+        textAlign: 'left'
+      }}
+    >
+      <span style={{ fontSize: 14 }}>{icon}</span>
+      <span style={{ flex: 1 }}>
+        <span style={{ fontWeight: 600 }}>{label}</span>
+        <span style={{ display: 'block', color: 'var(--muted-foreground, #888)', fontSize: 10 }}>{hint}</span>
+      </span>
+      <span style={{ fontSize: 16, color: 'var(--muted-foreground, #888)', fontWeight: 600 }}>{count}</span>
+      <span style={{ color: 'var(--muted-foreground, #888)' }}>›</span>
+    </button>
+  )
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ display: 'flex', gap: 4, padding: '8px 12px', borderBottom: '1px solid var(--border, #2a2a2a)', alignItems: 'center' }}>
-        <span style={{ fontWeight: 600, fontSize: 13 }}>📚 Capabilities</span>
-        <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-          {(['skills', 'tools', 'mcps'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                background: tab === t ? 'var(--accent, #5e6ad2)' : 'transparent',
-                border: '1px solid var(--border, #2a2a2a)',
-                borderRadius: 999,
-                padding: '2px 12px',
-                color: tab === t ? '#fff' : 'inherit',
-                cursor: 'pointer',
-                fontSize: 11,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-                fontFamily: 'inherit'
-              }}
-            >
-              {t}
-            </button>
-          ))}
+        <span style={{ fontWeight: 600, fontSize: 13 }}>🧭 Capabilities</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--muted-foreground, #888)' }}>
+          tap to open
         </span>
-        <button aria-label="Close" onClick={onClose} style={{ marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}></button>
+        <button aria-label="Close" onClick={onClose} style={closeBtn}>✕</button>
       </div>
 
-      {error && <p style={{ padding: 10, color: '#f7768e', fontSize: 12 }}>{error}</p>}
+      {error && <div style={{ padding: '8px 12px', fontSize: 11, color: '#f7768e' }}>{error}</div>}
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-        {tab === 'skills' && (skills.length === 0
-          ? <Empty label="No skills found (endpoint may need the gateway)." />
-          : skills.map((s) => (
-              <div key={s.id ?? s.name} style={{ border: '1px solid var(--border, #2a2a2a)', borderRadius: 8, padding: 10, marginBottom: 6 }}>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>{s.name}</div>
-                {s.description && <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{s.description.slice(0, 120)}</div>}
-              </div>
-            )))}
-        {tab === 'tools' && (tools.length === 0
-          ? <Empty label="No tools listed." />
-          : tools.map((t) => (
-              <div key={t.name} style={{ border: '1px solid var(--border, #2a2a2a)', borderRadius: 8, padding: 10, marginBottom: 6 }}>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>{t.name}</div>
-                {t.toolset && <div style={{ fontSize: 10, opacity: 0.5 }}>toolset: {t.toolset}</div>}
-              </div>
-            )))}
-        {tab === 'mcps' && (mcps.length === 0
-          ? <Empty label="No MCP servers." />
-          : mcps.map((m) => (
-              <div key={m.name} style={{ border: '1px solid var(--border, #2a2a2a)', borderRadius: 8, padding: 10, marginBottom: 6, display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</span>
-                <span style={{ marginLeft: 'auto', fontSize: 11, color: m.status === 'connected' ? '#9ece6a' : '#888' }}>{m.status ?? 'unknown'}</span>
-              </div>
-            )))}
+      {row('skills-hub', '📚', 'Skills Hub', skills.length, 'install, search, enable skills')}
+      {row('mcp', '🔌', 'MCP Servers', mcps.length, 'add or remove model-context servers')}
+      {row('tools', '🛠', 'Tools', tools.length, 'enable or disable toolsets')}
+
+      <div style={{ padding: '10px 12px', fontSize: 11, color: 'var(--muted-foreground, #888)', lineHeight: 1.6 }}>
+        Counts are live. Full management lives in the dedicated panes above.
       </div>
     </div>
   )
 }
 
-function Empty({ label }: { label: string }) {
-  return <p style={{ padding: 16, color: 'var(--muted-foreground, #888)', fontSize: 12 }}>{label}</p>
+const closeBtn: React.CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  borderRadius: 4,
+  color: 'var(--muted-foreground, #888)',
+  cursor: 'pointer',
+  fontSize: 11,
+  fontFamily: 'inherit',
+  padding: '2px 6px'
 }

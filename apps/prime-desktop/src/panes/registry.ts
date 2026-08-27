@@ -9,7 +9,7 @@ export interface Pane {
   id: string
   label: string
   icon: string
-  render: ComponentType<{ onClose: () => void }>
+  render: ComponentType<{ onClose: () => void; onOpenPane?: (id: string) => void }>
 }
 
 const paneRegistry = new Map<string, Pane>()

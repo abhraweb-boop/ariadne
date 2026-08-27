@@ -477,7 +477,7 @@ export function App() {
                 flexDirection: 'column'
               }}
             >
-              <activePane.render onClose={() => setOpenPaneId(null)} />
+              <activePane.render onClose={() => setOpenPaneId(null)} onOpenPane={openPane} />
             </div>
           )}
           </ErrorBoundary>
