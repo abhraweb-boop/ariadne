@@ -8,10 +8,12 @@ import { lazy, Suspense } from 'react'
 import { CostBreakdown } from './CostBreakdown'
 import { CronPane } from './CronPane'
 import { FilesPane } from './FilesPane'
+import { McpPane } from './McpPane'
 import { registerPane } from './registry'
 import { ReviewPane } from './ReviewPane'
 import { SkillsHub } from './SkillsHub'
 import { TerminalPane } from './TerminalPane'
+import { ToolsPane } from './ToolsPane'
 
 export function registerAllPanes() {
   // Lazy imports — each pane is a separate file, loaded on first open.
@@ -108,6 +110,18 @@ export function registerAllPanes() {
     label: 'Cron',
     icon: '⏰',
     render: (props) => <CronPane {...props} />
+  })
+  registerPane({
+    id: 'mcp',
+    label: 'MCP',
+    icon: '🔌',
+    render: (props) => <McpPane {...props} />
+  })
+  registerPane({
+    id: 'tools',
+    label: 'Tools',
+    icon: '🛠',
+    render: (props) => <ToolsPane {...props} />
   })
   registerPane({
     id: 'review',

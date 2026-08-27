@@ -119,3 +119,8 @@ export function patch<T = unknown>(path: string, body: unknown): Promise<T> {
 export function del<T = unknown>(path: string): Promise<T> {
   return api<T>(path, { method: 'DELETE' })
 }
+
+/** PUT convenience. */
+export function put<T = unknown>(path: string, body: unknown): Promise<T> {
+  return api<T>(path, { method: 'PUT', body })
+}
