@@ -12,6 +12,7 @@ const DONE_KEY = 'prime-hermes:onboarding-done'
 const STEPS = [
   { title: 'Welcome', body: 'Welcome to Prime Hermes. Your AI harness.' },
   { title: 'Chat', body: 'Send messages to the Prime worker. Type code, ask questions, run plans.' },
+  { title: 'Gateway', body: 'Prime Hermes runs its own private gateway — no setup, no accounts. It starts with the app and powers everything you see.' },
   { title: 'Capabilities', body: 'Manage kernels, DAG plans, agents, and memory from the panel rail.' },
   { title: 'Beyond chat', body: 'Run Python cells in the kernel, orchestrate multi-step DAG plans, inspect agents, and roll back memory from the panel rail — all live, all yours.' },
   { title: 'Get started', body: 'Type a message to begin, or press Ctrl+K to explore.' }
@@ -20,12 +21,34 @@ const STEPS = [
 export function Onboarding({ onClose }: { onClose: () => void }) {
   const [visible, setVisible] = useState(false)
   const [step, setStep] = useState(0)
+  const [gatewayState, setGatewayState] = useState<'checking' | 'ready' | 'offline'>('checking')
 
   useEffect(() => {
     let done = false
     try { done = localStorage.getItem(DONE_KEY) === '1' } catch { /* ignore */ }
     setVisible(!done)
   }, [])
+
+  // P3: live gateway probe on the Gateway step
+  useEffect(() => {
+    if (!visible || STEPS[step].title !== 'Gateway') {return}
+    let alive = true
+    const probe = async () => {
+      if (!window.primeHermes?.gatewayStatus) {
+        setGatewayState('ready')
+        return
+      }
+      try {
+        const st = await window.primeHermes.gatewayStatus()
+        if (alive) {setGatewayState(st.healthy ? 'ready' : 'offline')}
+      } catch {
+        if (alive) {setGatewayState('offline')}
+      }
+    }
+    void probe()
+    const poll = setInterval(() => void probe(), 3000)
+    return () => { alive = false; clearInterval(poll) }
+  }, [visible, step])
 
   const finish = useCallback(() => {
     try { localStorage.setItem(DONE_KEY, '1') } catch { /* ignore */ }
@@ -69,6 +92,39 @@ export function Onboarding({ onClose }: { onClose: () => void }) {
         <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--muted-foreground, #888)', marginBottom: 20 }}>
           {s.body}
         </div>
+
+        {/* P3: gateway status on the Gateway step */}
+        {s.title === 'Gateway' && (
+          <div
+            aria-live="polite"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 12,
+              padding: '8px 10px',
+              border: '1px solid var(--border, #2a2a2a)',
+              borderRadius: 6,
+              marginBottom: 20
+            }}
+          >
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                background:
+                  gatewayState === 'ready' ? '#9ece6a'
+                    : gatewayState === 'offline' ? '#f7768e' : '#e0af68'
+              }}
+            />
+            <span>
+              {gatewayState === 'ready' && 'Gateway is running — you’re all set.'}
+              {gatewayState === 'checking' && 'Starting your private gateway…'}
+              {gatewayState === 'offline' && 'Gateway not reachable yet — retrying…'}
+            </span>
+          </div>
+        )}
 
         {/* Progress dots */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>

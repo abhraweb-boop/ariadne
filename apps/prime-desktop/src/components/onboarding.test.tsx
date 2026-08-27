@@ -22,7 +22,7 @@ describe('Onboarding', () => {
   })
   it('shows Start button on last step', () => {
     render(<Onboarding onClose={() => {}} />)
-    for (let i = 0; i < 4; i++) { fireEvent.click(screen.getByText('Next')) }
+    for (let i = 0; i < 5; i++) { fireEvent.click(screen.getByText('Next')) }
     expect(screen.getByText('Start using Prime')).toBeTruthy()
   })
   it('does not show after completion', () => {
