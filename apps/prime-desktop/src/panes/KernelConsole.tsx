@@ -63,7 +63,7 @@ export function KernelConsole({ onClose }: { onClose: () => void }) {
             <button onClick={startKernel} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 4, padding: '2px 8px', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit' }}>Start kernel</button>
           ) : `kernel ${status}`}
         </span>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}></button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 10 }}>
         {cells.map((c, i) => (

@@ -80,13 +80,13 @@ export function FilesPane({ onClose }: { onClose: () => void }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--border, #2a2a2a)' }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>📁 Files</span>
         {history.length > 0 && (
-          <button onClick={goUp} style={ghostBtn}>↑ up</button>
+          <button aria-label="Go up" onClick={goUp} style={ghostBtn}></button>
         )}
         <button onClick={() => void load('')} style={ghostBtn}>↻</button>
         <span style={{ flex: 1, fontSize: 11, color: 'var(--muted-foreground, #888)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {path || '/'}
         </span>
-        <button onClick={onClose} style={ghostBtn}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={ghostBtn}></button>
       </div>
 
       {preview ? (

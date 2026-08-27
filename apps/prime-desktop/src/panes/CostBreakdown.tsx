@@ -29,15 +29,19 @@ export function CostBreakdown({ onClose }: { onClose: () => void }) {
         const sessionId = String(payload.session_id ?? payload.sessionId ?? 'unknown')
         setBySession((prev) => {
           const existing = prev.find((s) => s.id === sessionId)
+
           if (existing) {
             return prev.map((s) => (s.id === sessionId ? { ...s, tokens: s.tokens + tokens } : s))
           }
+
           return [...prev, { id: sessionId, label: sessionId.slice(0, 20), tokens }]
         })
         setTotal((t) => t + tokens)
       }
     })
+
     setLoading(false)
+
     return unsub
   }, [])
 
@@ -48,7 +52,7 @@ export function CostBreakdown({ onClose }: { onClose: () => void }) {
         <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted-foreground, #888)', fontVariantNumeric: 'tabular-nums' }}>
           total: {total.toLocaleString()}
         </span>
-        <button onClick={onClose} style={ghostBtn}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={ghostBtn}></button>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>

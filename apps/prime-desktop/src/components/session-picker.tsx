@@ -100,7 +100,7 @@ export function SessionPicker({
             color: 'var(--foreground, #efefef)',
             fontSize: 14,
             fontFamily: 'inherit',
-            outline: 'none'
+            
           }}
           value={query}
         />

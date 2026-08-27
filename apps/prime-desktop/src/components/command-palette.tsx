@@ -98,7 +98,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
             color: 'var(--foreground, #efefef)',
             fontSize: 14,
             fontFamily: 'inherit',
-            outline: 'none'
+            
           }}
           value={query}
         />

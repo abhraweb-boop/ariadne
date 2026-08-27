@@ -28,7 +28,7 @@ export function Agents({ onClose }: { onClose: () => void }) {
     <div style={{ padding: 12, fontSize: 13 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontWeight: 600 }}>👾 Agents</span>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}></button>
       </div>
       <div style={{ border: '1px solid var(--border, #2a2a2a)', borderRadius: 8, padding: 12 }}>
         <div style={{ fontWeight: 500, marginBottom: 8 }}>Prime Worker</div>

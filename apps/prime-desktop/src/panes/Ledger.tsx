@@ -60,7 +60,7 @@ export function Ledger({ onClose }: { onClose: () => void }) {
         <span style={{ fontWeight: 600, fontSize: 13 }}>📓 Refine Ledger</span>
         <button onClick={() => void refresh()} style={{ marginLeft: 8, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 12, opacity: 0.7, fontFamily: 'inherit' }}>↻</button>
         <span style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.5, fontVariantNumeric: 'tabular-nums' }}>{entries.length} entries</span>
-        <button onClick={onClose} style={{ marginLeft: 8, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={{ marginLeft: 8, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}></button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
         {entries.length === 0 && <p style={{ padding: 16, color: 'var(--muted-foreground, #888)', fontSize: 12 }}>Ledger empty — memory writes will appear here.</p>}

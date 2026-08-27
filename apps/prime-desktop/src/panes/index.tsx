@@ -5,8 +5,8 @@
 
 import { lazy, Suspense } from 'react'
 
-import { FilesPane } from './FilesPane'
 import { CostBreakdown } from './CostBreakdown'
+import { FilesPane } from './FilesPane'
 import { registerPane } from './registry'
 import { ReviewPane } from './ReviewPane'
 import { TerminalPane } from './TerminalPane'

@@ -50,7 +50,7 @@ export function GraphLens({ onClose }: { onClose: () => void }) {
                 >
                   {viewMode === 'graph' ? '☰ List' : '🕸 Graph'}
                 </button>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}>✕</button>
+                <button aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}></button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
         {loading && <p style={{ padding: 20, color: 'var(--muted-foreground, #888)' }}>Loading…</p>}

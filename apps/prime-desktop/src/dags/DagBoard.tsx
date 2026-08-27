@@ -330,11 +330,9 @@ export function DagBoard({ onClose }: { onClose: () => void }) {
           {planState ? `state: ${planState}` : ''}
         </span>
         <button
+          aria-label="Close"
           onClick={onClose}
-          style={{ marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}
-        >
-          ✕
-        </button>
+         style={{ marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}></button>
       </div>
 
       {!planId && (

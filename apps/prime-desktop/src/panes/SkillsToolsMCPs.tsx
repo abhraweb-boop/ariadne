@@ -56,7 +56,7 @@ export function SkillsToolsMCPs({ onClose }: { onClose: () => void }) {
             </button>
           ))}
         </span>
-        <button onClick={onClose} style={{ marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={{ marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}></button>
       </div>
 
       {error && <p style={{ padding: 10, color: '#f7768e', fontSize: 12 }}>{error}</p>}

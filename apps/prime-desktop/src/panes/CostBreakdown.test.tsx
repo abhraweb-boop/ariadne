@@ -1,9 +1,10 @@
+import { cleanup, render, screen } from '@testing-library/react'
 /**
  * G3 — CostBreakdown tests.
  * @vitest-environment jsdom
  */
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+
 import { CostBreakdown } from './CostBreakdown'
 
 afterEach(cleanup)

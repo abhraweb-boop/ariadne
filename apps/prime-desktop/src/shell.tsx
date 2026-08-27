@@ -19,11 +19,11 @@ import { ErrorBoundary } from './components/error-boundary'
 import { FindBar } from './components/find-bar'
 import { MarkdownText } from './components/markdown-text'
 import { Notifications } from './components/notifications'
-import { SessionPicker } from './components/session-picker'
 import { Onboarding } from './components/onboarding'
-import { KernelWidget, MemoryWidget, PlanCountWidget, WorkerWidget } from './components/statusbar-widgets'
+import { SessionPicker } from './components/session-picker'
 import { SessionRail } from './components/session-rail'
 import { Statusbar } from './components/statusbar'
+import { KernelWidget, MemoryWidget, PlanCountWidget, WorkerWidget } from './components/statusbar-widgets'
 import { StreamingCaret } from './components/streaming-caret'
 import { Titlebar } from './components/titlebar'
 import { type BusEvent, onEvent, startEventBus } from './event-bus'
@@ -83,6 +83,12 @@ export function App() {
   const sessionIdRef = useRef<string | null>(null)
   // Keep ref in sync with sessionId
   useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
+  // Overlay-stacking guard: shortcut handlers read this ref to avoid
+  // opening a second overlay on top of an open one (final review).
+  const overlaysRef = useRef({ paletteOpen: false, findOpen: false, pickerOpen: false })
+  useEffect(() => {
+    overlaysRef.current = { paletteOpen, findOpen, pickerOpen }
+  })
   // S5: resume banner
   const [finishedAway, setFinishedAway] = useState<FinishedAwayPlan[]>([])
 
@@ -152,19 +158,28 @@ export function App() {
       id: 'palette:open',
       label: 'Open command palette',
       combo: 'Ctrl+K',
-      handler: () => setPaletteOpen(true)
+      handler: () => {
+        if (overlaysRef.current.pickerOpen || overlaysRef.current.findOpen) {return}
+        setPaletteOpen(true)
+      }
     })
     registerShortcut({
       id: 'find:open',
       label: 'Find in conversation',
       combo: 'Ctrl+F',
-      handler: () => setFindOpen(true)
+      handler: () => {
+        if (overlaysRef.current.paletteOpen || overlaysRef.current.pickerOpen) {return}
+        setFindOpen(true)
+      }
     })
     registerShortcut({
       id: 'session:pick',
       label: 'Switch session',
       combo: 'Ctrl+P',
-      handler: () => setPickerOpen(true)
+      handler: () => {
+        if (overlaysRef.current.paletteOpen || overlaysRef.current.findOpen) {return}
+        setPickerOpen(true)
+      }
     })
     // Ctrl+Tab cycles sessions (Hermes desktop switcher behavior)
     registerShortcut({
@@ -214,8 +229,8 @@ export function App() {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        background: '#101012',
-        color: '#efefef',
+        background: 'var(--background, #101012)',
+        color: 'var(--foreground, #efefef)',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
         fontSize: 14
       }}
@@ -227,10 +242,10 @@ export function App() {
         <nav
           style={{
             width: 260,
-            borderRight: '1px solid #2a2a2a',
+            borderRight: '1px solid var(--border, #2a2a2a)',
             display: 'flex',
             flexDirection: 'column',
-            background: '#101012',
+            background: 'var(--background, #101012)',
             overflowY: 'auto'
           }}
         >
@@ -242,7 +257,7 @@ export function App() {
             onNewSession={() => { setSessionId(null); setMessages([]) }}
             onSelect={(id) => setSessionId(id)}
           />
-          <div style={{ borderTop: '1px solid #2a2a2a', marginTop: 8, paddingTop: 8 }}>
+          <div style={{ borderTop: '1px solid var(--border, #2a2a2a)', marginTop: 8, paddingTop: 8 }}>
             <div style={{ padding: '4px 14px', fontSize: 11, opacity: 0.5 }}>Panels</div>
             {getPanes().map((pane) => (
               <button
@@ -256,7 +271,7 @@ export function App() {
                   padding: '6px 14px',
                   textAlign: 'left',
                   background: 'transparent',
-                  color: '#efefef',
+                  color: 'var(--foreground, #efefef)',
                   border: 'none',
                   cursor: 'pointer',
                   fontSize: 12,
@@ -405,8 +420,8 @@ export function App() {
             <div
               style={{
                 width: 480,
-                borderLeft: '1px solid #2a2a2a',
-                background: '#101012',
+                borderLeft: '1px solid var(--border, #2a2a2a)',
+                background: 'var(--background, #101012)',
                 overflow: 'auto',
                 display: 'flex',
                 flexDirection: 'column'
@@ -438,8 +453,8 @@ export function App() {
       {/* Session picker (C2) */}
       {pickerOpen && (
         <SessionPicker
-          onSelect={(id) => setSessionId(id)}
           onClose={() => setPickerOpen(false)}
+          onSelect={(id) => setSessionId(id)}
         />
       )}
 

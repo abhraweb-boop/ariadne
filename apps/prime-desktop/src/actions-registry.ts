@@ -58,6 +58,6 @@ export function registerCoreActions(handlers: {
     label: 'View Cost Breakdown',
     keywords: ['cost', 'tokens', 'spend', 'budget'],
     category: 'Monitoring',
-    run: () => openPane('settings')
+    run: () => openPane('cost')
   })
 }

@@ -33,7 +33,7 @@ export function TerminalPane({ onClose }: { onClose: () => void }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>🖥 Terminal</span>
-        <button onClick={onClose} style={ghostBtn}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={ghostBtn}></button>
       </div>
 
       <div

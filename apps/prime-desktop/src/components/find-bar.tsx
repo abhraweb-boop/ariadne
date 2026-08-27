@@ -88,7 +88,7 @@ export function FindBar({
           color: 'var(--foreground, #efefef)',
           fontSize: 13,
           fontFamily: 'inherit',
-          outline: 'none'
+          
         }}
         value={query}
       />

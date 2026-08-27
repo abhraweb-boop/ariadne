@@ -55,7 +55,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
     <div style={{ padding: 14, fontSize: 13 }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
         <span style={{ fontWeight: 600, fontSize: 13 }}>⚙ Settings</span>
-        <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16 }}></button>
       </div>
 
       <div style={{ fontSize: 11, color: 'var(--muted-foreground, #888)', marginBottom: 6 }}>Gateway base URL</div>

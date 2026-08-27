@@ -55,7 +55,7 @@ export function ReviewPane({ onClose }: { onClose: () => void }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--border, #2a2a2a)' }}>
         <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>🔍 Review</span>
         <button onClick={() => void load()} style={ghostBtn}>↻</button>
-        <button onClick={onClose} style={ghostBtn}>✕</button>
+        <button aria-label="Close" onClick={onClose} style={ghostBtn}></button>
       </div>
 
       {diffContent !== null ? (
