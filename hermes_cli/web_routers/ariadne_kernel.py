@@ -117,4 +117,45 @@ def ledger_rollback(entry_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
         rolled = ledger.rollback_entry(entry_id, seq=seq)
         return {"ok": True, "entry": rolled}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ── refine / heal (S: self-learning) ──────────────────────────────────────
+
+
+@router.post("/refine")
+def refine(goal: str = "") -> Dict[str, Any]:
+    """Capture a self-improvement snapshot.
+
+    Records a new ledger entry with the current state and a summary of what
+    the agent learned. The goal is a free-text description of the improvement
+    intent (e.g. "extend the terminal pane to support xterm.js").
+    """
+    try:
+        ledger = _ledger()
+        entry = ledger.add(
+            body=goal or "auto-improvement",
+            kind="refine",
+            title=f"Refine: {goal or 'auto-improvement'}",
+            source="desktop-refine",
+        )
+        return {"ok": True, "entry": entry}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/heals")
+def heals() -> Dict[str, Any]:
+    """Return recent self-healing events (from the journal or a sentinel file)."""
+    import json as _json
+
+    home = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
+    heals_file = home / "ariadne" / "heals.json"
+    if not heals_file.exists():
+        return {"ok": True, "heals": []}
+    try:
+        data = _json.loads(heals_file.read_text(encoding="utf-8"))
+        heals_list = data if isinstance(data, list) else []
+        return {"ok": True, "heals": heals_list}
+    except (OSError, _json.JSONDecodeError):
+        return {"ok": True, "heals": []}

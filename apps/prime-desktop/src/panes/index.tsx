@@ -13,6 +13,7 @@ import { McpPane } from './McpPane'
 import { ProfilesPane } from './ProfilesPane'
 import { registerPane } from './registry'
 import { ReviewPane } from './ReviewPane'
+import { SelfImprovePane } from './SelfImprovePane'
 import { SkillsHub } from './SkillsHub'
 import { StarmapPane } from './StarmapPane'
 import { TerminalPane } from './TerminalPane'
@@ -150,6 +151,12 @@ export function registerAllPanes() {
     label: 'Starmap',
     icon: '🗺',
     render: (props) => <StarmapPane {...props} />
+  })
+  registerPane({
+    id: 'self-improve',
+    label: 'Self-Improve',
+    icon: '🧠',
+    render: (props) => <SelfImprovePane {...props} />
   })
   registerPane({
     id: 'review',
