@@ -85,3 +85,10 @@ def test_windows_style_backslash_blocked(client):
     """Backslash traversal (Windows separator) must be blocked too."""
     r = client.get("/api/ariadne/files/read", params={"path": "..\\..\\secret.txt"})
     assert r.status_code == 400
+
+
+def test_absolute_path_blocked(client):
+    """Absolute paths (leading / or \\, or drive-qualified) must be rejected."""
+    for p in ("/etc/hosts", "\\Windows\\win.ini", "C:\\Windows\\win.ini"):
+        r = client.get("/api/ariadne/files/read", params={"path": p})
+        assert r.status_code == 400, f"absolute path not blocked: {p}"

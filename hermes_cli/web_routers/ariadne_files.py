@@ -24,7 +24,12 @@ def _root() -> Path:
 
 def _resolve(subpath: str) -> Path:
     root = _root()
-    target = (root / subpath.lstrip("/")).resolve()
+    # Reject absolute paths outright: on Windows a leading "\\" operand makes
+    # pathlib discard the root entirely (Path(cwd)/"\\Windows\\win.ini" ->
+    # C:\\Windows\\win.ini), so never let one reach the join.
+    if Path(subpath).is_absolute() or subpath.startswith(("/", "\\")):
+        raise HTTPException(400, "path must be relative")
+    target = (root / subpath.lstrip("/\\")).resolve()
     # Containment via relative_to — correct for prefix-siblings (e.g.
     # "/workspace" vs "/workspace-evil"), Windows case + backslashes, and
     # symlink escapes (resolve() follows links before this check).
