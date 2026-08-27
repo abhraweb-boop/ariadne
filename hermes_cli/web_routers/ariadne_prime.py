@@ -41,6 +41,9 @@ def _load_bridge():
             sys.path.insert(0, scripts_dir)
         from prime_bridge import PrimeBridge
 
+        # The bridge respects PRIME_AGENT_CMD / PRIME_AGENT_PROVIDER /
+        # PRIME_AGENT_MODEL env vars for the child process. If unset and
+        # prime-agent is not on PATH, the bridge will fail to start.
         _bridge = PrimeBridge()
         return _bridge
     except Exception:
@@ -70,8 +73,9 @@ def prime_state() -> Dict[str, Any]:
     try:
         state = bridge.get_state()
         return {"ok": True, "running": state is not None, "state": state}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception:
+        # Bridge not started yet — get_state() raises. Honest stopped state.
+        return {"ok": True, "running": False, "state": None}
 
 
 @router.post("/start")
