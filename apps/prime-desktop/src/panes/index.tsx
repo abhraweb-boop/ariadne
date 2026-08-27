@@ -9,11 +9,13 @@ import { CostBreakdown } from './CostBreakdown'
 import { CronPane } from './CronPane'
 import { FilesPane } from './FilesPane'
 import { McpPane } from './McpPane'
+import { ProfilesPane } from './ProfilesPane'
 import { registerPane } from './registry'
 import { ReviewPane } from './ReviewPane'
 import { SkillsHub } from './SkillsHub'
 import { TerminalPane } from './TerminalPane'
 import { ToolsPane } from './ToolsPane'
+import { WebhooksPane } from './WebhooksPane'
 
 export function registerAllPanes() {
   // Lazy imports — each pane is a separate file, loaded on first open.
@@ -122,6 +124,18 @@ export function registerAllPanes() {
     label: 'Tools',
     icon: '🛠',
     render: (props) => <ToolsPane {...props} />
+  })
+  registerPane({
+    id: 'profiles',
+    label: 'Profiles',
+    icon: '👤',
+    render: (props) => <ProfilesPane {...props} />
+  })
+  registerPane({
+    id: 'webhooks',
+    label: 'Webhooks',
+    icon: '🔔',
+    render: (props) => <WebhooksPane {...props} />
   })
   registerPane({
     id: 'review',
