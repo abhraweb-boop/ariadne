@@ -75,7 +75,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           background: 'var(--theme-mix-card, #1a1a1a)',
           border: '1px solid var(--border, #2a2a2a)',
           borderRadius: 10,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          boxShadow: 'var(--shadow-nous, 0 8px 32px rgba(0,0,0,0.5))',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column'

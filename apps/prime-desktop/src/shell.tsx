@@ -311,6 +311,8 @@ export function App() {
               <button
                 key={pane.id}
                 onClick={() => openPane(pane.id)}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'color-mix(in srgb, var(--foreground, #efefef) 8%, transparent)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -367,7 +369,7 @@ export function App() {
                       <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.goal.slice(0, 80)}
                       </span>
-                      <span style={{ fontSize: 11, color: 'var(--accent, #9ece6a)', border: '1px solid var(--accent, #9ece6a)', borderRadius: 999, padding: '0 8px' }}>
+                      <span style={{ fontSize: 11, color: '#9ece6a', border: '1px solid var(--accent, #9ece6a)', borderRadius: 999, padding: '0 8px' }}>
                         {p.state}
                       </span>
                       <button
@@ -417,9 +419,9 @@ export function App() {
                           key={si}
                           style={{
                             background: activeFind?.messageIndex === messages.indexOf(m)
-                              ? 'var(--accent, #e0af68)'
+                              ? '#e0af68'
                               : 'var(--accent, #5e6ad2)',
-                            color: '#101012',
+                            color: 'var(--accent-fg, #fff)',
                             borderRadius: 2,
                             padding: '0 1px'
                           }}

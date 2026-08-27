@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 
 import { get } from '../api'
 import { type BusEvent, onEvent } from '../event-bus'
+
 import { StatusDot, type StatusState } from './status-dot'
 
 /** Kernel busy/idle dot (polls /api/ariadne/kernel/status). */
@@ -21,14 +22,16 @@ export function KernelWidget({ onOpen }: { onOpen?: () => void }) {
         .then((r) => setState(r.ok ? (r.running ? 'busy' : 'connected') : 'offline'))
         .catch(() => setState('offline'))
     }
+
     poll()
     const interval = setInterval(poll, 5000)
+
     return () => clearInterval(interval)
   }, [])
 
   return (
-    <button onClick={onOpen} style={widgetBtnStyle} aria-label="Kernel status">
-      <StatusDot state={state} label={`kernel ${state}`} />
+    <button aria-label="Kernel status" onClick={onOpen} onMouseEnter={(e) => hoverBtn(e, true)} onMouseLeave={(e) => hoverBtn(e, false)} style={widgetBtnStyle}>
+      <StatusDot label={`kernel ${state}`} state={state} />
       <span>kernel</span>
     </button>
   )
@@ -48,14 +51,16 @@ export function PlanCountWidget({ onOpen }: { onOpen?: () => void }) {
         })
         .catch(() => {})
     }
+
     poll()
     const interval = setInterval(poll, 10000)
+
     return () => clearInterval(interval)
   }, [])
 
   return (
-    <button onClick={onOpen} style={widgetBtnStyle} aria-label="Running plans">
-      <StatusDot state={count && count > 0 ? 'busy' : 'connected'} label={count ? `${count} running` : 'no plans'} />
+    <button aria-label="Running plans" onClick={onOpen} onMouseEnter={(e) => hoverBtn(e, true)} onMouseLeave={(e) => hoverBtn(e, false)} style={widgetBtnStyle}>
+      <StatusDot label={count ? `${count} running` : 'no plans'} state={count && count > 0 ? 'busy' : 'connected'} />
       <span style={{ fontVariantNumeric: 'tabular-nums' }}>plans {count ?? '–'}</span>
     </button>
   )
@@ -68,15 +73,18 @@ export function WorkerWidget({ onOpen }: { onOpen?: () => void }) {
   useEffect(() => {
     const unsub = onEvent('prime.*', (ev: BusEvent) => {
       if (ev.type === 'prime.spawned') {setState('busy')}
+
       if (ev.type === 'prime.agent_end' || ev.type === 'prime.stopped') {setState('connected')}
+
       if (ev.type === 'prime.agent_error') {setState('offline')}
     })
+
     return unsub
   }, [])
 
   return (
-    <button onClick={onOpen} style={widgetBtnStyle} aria-label="Worker status">
-      <StatusDot state={state} label={`worker ${state}`} />
+    <button aria-label="Worker status" onClick={onOpen} onMouseEnter={(e) => hoverBtn(e, true)} onMouseLeave={(e) => hoverBtn(e, false)} style={widgetBtnStyle}>
+      <StatusDot label={`worker ${state}`} state={state} />
       <span>worker</span>
     </button>
   )
@@ -92,17 +100,26 @@ export function MemoryWidget({ onOpen }: { onOpen?: () => void }) {
         .then((r) => { if (r.ok) {setCount(r.entries.length)} })
         .catch(() => {})
     }
+
     poll()
     const interval = setInterval(poll, 15000)
+
     return () => clearInterval(interval)
   }, [])
 
   return (
-    <button onClick={onOpen} style={widgetBtnStyle} aria-label="Ledger memory">
-      <StatusDot state={count && count > 0 ? 'connected' : 'unknown'} label={count ? `${count} entries` : 'empty ledger'} />
+    <button aria-label="Ledger memory" onClick={onOpen} onMouseEnter={(e) => hoverBtn(e, true)} onMouseLeave={(e) => hoverBtn(e, false)} style={widgetBtnStyle}>
+      <StatusDot label={count ? `${count} entries` : 'empty ledger'} state={count && count > 0 ? 'connected' : 'unknown'} />
       <span style={{ fontVariantNumeric: 'tabular-nums' }}>mem {count ?? '–'}</span>
     </button>
   )
+}
+
+
+function hoverBtn(e: React.MouseEvent<HTMLButtonElement>, on: boolean): void {
+  e.currentTarget.style.background = on
+    ? 'color-mix(in srgb, var(--foreground, #efefef) 8%, transparent)'
+    : 'transparent'
 }
 
 const widgetBtnStyle: React.CSSProperties = {

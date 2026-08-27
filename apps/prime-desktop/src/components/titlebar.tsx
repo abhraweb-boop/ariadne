@@ -3,7 +3,7 @@
  *
  * Frameless window: this bar is the drag region; buttons are no-drag.
  * Brand mark left, window controls (min/max/close) right, matching Hermes
- * desktop's 34px height and control affordances.
+ * desktop's compact 30px height and 24px control affordances.
  *
  * Window bridge types live in api.ts (single global declaration).
  */
@@ -48,7 +48,7 @@ export function Titlebar() {
             width: 14,
             height: 14,
             borderRadius: 3,
-            background: 'linear-gradient(135deg, #5e6ad2, #9ece6a)',
+            background: 'linear-gradient(135deg, var(--accent, #5e6ad2), #9ece6a)',
             display: 'inline-block',
             flexShrink: 0
           }}

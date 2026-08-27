@@ -63,7 +63,7 @@ export function Statusbar({
     { id: 'model', label: model, icon: '🧠' },
     { id: 'gateway', label: 'Gateway', icon: '⚡', badge: { color: '#9ece6a', label: 'connected' } },
     { id: 'approval', label: 'Approval', icon: '🛡️', badge: { color: '#e0af68', label: 'auto' } },
-    { id: 'context', label: 'Context', icon: '📄', badge: { color: '#888', label: '3.2K' } },
+    { id: 'context', label: 'Context', icon: '📄', badge: { color: 'var(--muted-foreground, #888)', label: '3.2K' } },
   ]
 
   return (
@@ -143,11 +143,11 @@ export function Statusbar({
                   borderRadius: 6,
                   padding: '4px 0',
                   minWidth: 180,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                  boxShadow: 'var(--shadow-nous, 0 4px 12px rgba(0,0,0,0.4))',
                   zIndex: 100
                 }}
               >
-                <div style={{ padding: '4px 10px', fontSize: 10, color: 'var(--muted-foreground, #888)', borderBottom: '1px solid var(--border, #2a2a2a)' }}>
+                <div style={{ padding: '4px 10px', fontSize: 10, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--muted-foreground, #888)', borderBottom: '1px solid var(--border, #2a2a2a)' }}>
                   Active model
                 </div>
                 <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--foreground, #efefef)' }}>

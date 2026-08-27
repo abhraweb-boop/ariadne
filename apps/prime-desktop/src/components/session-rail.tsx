@@ -146,6 +146,8 @@ export function SessionRail({
           ) : (
             <button
               onClick={() => onSelect(s.id)}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'color-mix(in srgb, var(--foreground, #efefef) 8%, transparent)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
               style={{
                 display: 'block',
                 flex: 1,
@@ -153,7 +155,7 @@ export function SessionRail({
                 padding: '8px 14px',
                 textAlign: 'left',
                 background: activeId === s.id ? 'var(--accent, #5e6ad2)' : 'transparent',
-                color: '#efefef',
+                color: 'var(--foreground, #efefef)',
                 border: 'none',
                 cursor: 'pointer',
                 fontSize: 13,
@@ -175,7 +177,7 @@ export function SessionRail({
                 right: 6,
                 background: 'transparent',
                 border: 'none',
-                color: '#efefef',
+                color: 'var(--foreground, #efefef)',
                 cursor: 'pointer',
                 fontSize: 11,
                 padding: '2px 4px',
@@ -194,10 +196,10 @@ export function SessionRail({
                 right: 6,
                 top: '100%',
                 zIndex: 50,
-                background: '#1a1a1a',
+                background: 'var(--theme-mix-card, #1a1a1a)',
                 border: '1px solid var(--border, #2a2a2a)',
                 borderRadius: 6,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                boxShadow: 'var(--shadow-nous, 0 4px 12px rgba(0,0,0,0.4))',
                 minWidth: 140
               }}
             >

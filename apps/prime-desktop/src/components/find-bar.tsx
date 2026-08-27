@@ -119,11 +119,17 @@ export function FindBar({
       >
         ↓
       </button>
-      <button aria-label="Close find" onClick={onClose} style={navBtnStyle}>
+      <button aria-label="Close find" onClick={onClose} onMouseEnter={(e) => hoverBtn(e, true)} onMouseLeave={(e) => hoverBtn(e, false)} style={navBtnStyle}>
         ✕
       </button>
     </div>
   )
+}
+
+function hoverBtn(e: React.MouseEvent<HTMLButtonElement>, on: boolean): void {
+  e.currentTarget.style.background = on
+    ? 'color-mix(in srgb, var(--foreground, #efefef) 8%, transparent)'
+    : 'transparent'
 }
 
 const navBtnStyle: React.CSSProperties = {
