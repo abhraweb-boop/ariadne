@@ -17,6 +17,9 @@ declare global {
       windowMinimize?: () => Promise<void>
       windowMaximize?: () => Promise<void>
       windowClose?: () => Promise<void>
+      // P2: embedded gateway control
+      gatewayStatus?: () => Promise<{ healthy: boolean; spawned: boolean; base: string }>
+      gatewayRestart?: () => Promise<{ ok: boolean }>
     }
   }
 }

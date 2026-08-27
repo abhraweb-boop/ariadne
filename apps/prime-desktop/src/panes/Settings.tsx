@@ -2,7 +2,7 @@
  * Settings pane — per-surface model routing (S6), gateway base, layout reset.
  */
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { gatewayBase } from '../api'
 import { type Accent, ACCENTS, applyTheme, loadPrefs, savePrefs, THEME_STORAGE_KEY, type ThemeMode, type ThemePrefs } from '../themes'
@@ -19,18 +19,51 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [base, setBase] = useState('…')
   // E1: appearance state
   const [prefs, setPrefs] = useState<ThemePrefs>(loadPrefs())
+  // P2: embedded gateway state
+  const [gatewayStatus, setGatewayStatus] = useState<'healthy' | 'connecting' | 'offline'>('connecting')
+  const [restarting, setRestarting] = useState(false)
+
+  const checkGateway = useCallback(async () => {
+    if (!window.primeHermes?.gatewayStatus) {
+      setGatewayStatus('healthy') // browser dev fallback: assume reachable
+      return
+    }
+    try {
+      const st = await window.primeHermes.gatewayStatus()
+      setGatewayStatus(st.healthy ? 'healthy' : 'offline')
+    } catch {
+      setGatewayStatus('offline')
+    }
+  }, [])
+
+  const restartGateway = useCallback(async () => {
+    if (!window.primeHermes?.gatewayRestart) {return}
+    setRestarting(true)
+    setGatewayStatus('connecting')
+    try {
+      await window.primeHermes.gatewayRestart()
+      // give it a moment, then re-probe
+      await new Promise((r) => setTimeout(r, 1500))
+      await checkGateway()
+    } finally {
+      setRestarting(false)
+    }
+  }, [checkGateway])
 
   useEffect(() => {
     void gatewayBase().then(setBase)
+    void checkGateway()
+    const poll = setInterval(() => void checkGateway(), 15_000)
+    return () => clearInterval(poll)
 
     try {
       const saved = localStorage.getItem(MODEL_KEY)
 
-      if (saved) {setModels(JSON.parse(saved))}
+      if (saved) {setModels(JSON.parse(saved!) as typeof models)}
     } catch {
       /* ignore */
     }
-  }, [])
+  }, [checkGateway])
 
   function save(next: typeof models) {
     setModels(next)
@@ -60,6 +93,39 @@ export function Settings({ onClose }: { onClose: () => void }) {
 
       <div style={{ fontSize: 11, color: 'var(--muted-foreground, #888)', marginBottom: 6 }}>Gateway base URL</div>
       <code style={{ display: 'block', fontSize: 12, padding: '6px 10px', border: '1px solid var(--border, #2a2a2a)', borderRadius: 4, marginBottom: 16 }}>{base}</code>
+
+      {/* P2: Embedded gateway status */}
+      <div style={{ fontSize: 11, color: 'var(--muted-foreground, #888)', marginBottom: 6 }}>
+        Embedded gateway (P2)
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span
+          aria-label={gatewayStatus === 'healthy' ? 'Gateway healthy' : gatewayStatus === 'connecting' ? 'Gateway connecting' : 'Gateway offline'}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            background:
+              gatewayStatus === 'healthy' ? '#9ece6a'
+                : gatewayStatus === 'connecting' ? '#e0af68' : '#f7768e'
+          }}
+        />
+        <span style={{ fontSize: 12 }}>
+          {gatewayStatus === 'healthy' ? 'Running' : gatewayStatus === 'connecting' ? 'Connecting…' : 'Offline'}
+        </span>
+        {gatewayStatus === 'offline' && (
+          <button
+            onClick={restartGateway}
+            disabled={restarting}
+            style={ghostBtn}
+          >
+            {restarting ? 'Restarting…' : 'Restart gateway'}
+          </button>
+        )}
+        {gatewayStatus !== 'offline' && (
+          <button onClick={() => void checkGateway()} style={ghostBtn}>↻ check</button>
+        )}
+      </div>
 
       {/* E1: Appearance */}
       <div style={{ fontSize: 11, color: 'var(--muted-foreground, #888)', marginBottom: 6 }}>
@@ -160,4 +226,15 @@ export function Settings({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   )
+}
+
+const ghostBtn: React.CSSProperties = {
+  background: 'transparent',
+  border: '1px solid var(--border, #2a2a2a)',
+  borderRadius: 4,
+  color: 'var(--foreground, #efefef)',
+  cursor: 'pointer',
+  fontSize: 11,
+  fontFamily: 'inherit',
+  padding: '2px 6px'
 }

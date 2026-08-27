@@ -1,0 +1,16 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5e6ad2"/>
+      <stop offset="1" stop-color="#9ece6a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#brand)"/>
+  <!-- Prime Hermes "P" monogram: a spiral → DAG-ish three nodes -->
+  <circle cx="256" cy="150" r="52" fill="#101012"/>
+  <circle cx="160" cy="330" r="52" fill="#101012" opacity="0.92"/>
+  <circle cx="352" cy="330" r="52" fill="#101012" opacity="0.92"/>
+  <path d="M 256 200 L 205 285" stroke="#101012" stroke-width="26" stroke-linecap="round"/>
+  <path d="M 256 200 L 307 285" stroke="#101012" stroke-width="26" stroke-linecap="round"/>
+  <path d="M 205 330 L 307 330" stroke="#101012" stroke-width="26" stroke-linecap="round"/>
+</svg>

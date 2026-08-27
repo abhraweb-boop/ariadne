@@ -19,4 +19,9 @@ contextBridge.exposeInMainWorld('primeHermes', {
   windowMinimize: (): Promise<void> => ipcRenderer.invoke('prime:window:minimize'),
   windowMaximize: (): Promise<void> => ipcRenderer.invoke('prime:window:maximize'),
   windowClose: (): Promise<void> => ipcRenderer.invoke('prime:window:close'),
+
+  // P2: embedded gateway control (Settings tab)
+  gatewayStatus: (): Promise<{ healthy: boolean; spawned: boolean; base: string }> =>
+    ipcRenderer.invoke('prime:gateway-status'),
+  gatewayRestart: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('prime:gateway-restart'),
 })
