@@ -6,9 +6,11 @@
 import { lazy, Suspense } from 'react'
 
 import { CostBreakdown } from './CostBreakdown'
+import { CronPane } from './CronPane'
 import { FilesPane } from './FilesPane'
 import { registerPane } from './registry'
 import { ReviewPane } from './ReviewPane'
+import { SkillsHub } from './SkillsHub'
 import { TerminalPane } from './TerminalPane'
 
 export function registerAllPanes() {
@@ -94,6 +96,18 @@ export function registerAllPanes() {
     label: 'Cost',
     icon: '💸',
     render: (props) => <CostBreakdown {...props} />
+  })
+  registerPane({
+    id: 'skills-hub',
+    label: 'Skills Hub',
+    icon: '📚',
+    render: (props) => <SkillsHub {...props} />
+  })
+  registerPane({
+    id: 'cron',
+    label: 'Cron',
+    icon: '⏰',
+    render: (props) => <CronPane {...props} />
   })
   registerPane({
     id: 'review',
