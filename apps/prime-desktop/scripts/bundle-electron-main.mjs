@@ -13,10 +13,10 @@ mkdirSync(distDir, { recursive: true })
 
 await build({
   entryPoints: [resolve(root, 'electron/main.ts')],
-  outfile: resolve(distDir, 'electron-main.mjs'),
+  outfile: resolve(distDir, 'electron-main.cjs'),
   bundle: true,
   platform: 'node',
-  format: 'esm',
+  format: 'cjs',
   target: 'node22',
   external: ['electron'],
   sourcemap: true,

@@ -6,7 +6,7 @@
  "description": "Desktop harness for Prime-Hermes: chat-first shell over agents, task DAGs, kernel, graph, and ledger.",
  "author": "Ariadne",
  "type": "module",
- "main": "dist/electron-main.mjs",
+ "main": "dist/electron-main.cjs",
  "scripts": {
   "clean": "tsc --build tsconfig.json --clean && tsc --build tsconfig.electron.json --clean",
   "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",

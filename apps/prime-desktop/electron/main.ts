@@ -13,13 +13,16 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, session } from 'electron'
 import { autoUpdater } from 'electron-updater'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
+// App root: the project root (where package.json lives). In dev that's the
+// repo app dir; in the packaged app it's the asar root. dist/index.html
+// sits directly under it.
+const APP_ROOT = app.getAppPath()
+
 
 // ── Gateway discovery ────────────────────────────────────────────────────
 // Rung ladder (desktop AGENTS.md: cross everything as an observable ladder):
@@ -28,7 +31,7 @@ function resolveGatewayBase(): string {
   const fromEnv = process.env.PRIME_GATEWAY_BASE
 
   if (fromEnv) {return fromEnv.replace(/\/+$/, '')}
-  const stamp = join(__dirname, '..', 'install-stamp.json')
+  const stamp = join(APP_ROOT, 'install-stamp.json')
 
   try {
     if (existsSync(stamp)) {
@@ -58,8 +61,8 @@ let shuttingDown = false
 function runtimeDir(): string | null {
   const candidates = [
     join(process.resourcesPath ?? '', 'runtime'),
-    join(__dirname, '..', 'resources', 'runtime'),
-    join(__dirname, '..', '..', 'resources', 'runtime')
+    join(APP_ROOT, 'resources', 'runtime'),
+    join(process.resourcesPath, 'runtime')
   ]
 
   return candidates.find((c) => existsSync(join(c, 'hermes.exe'))) ?? null
@@ -94,9 +97,35 @@ function spawnGateway(base: string, token: string): ChildProcess {
   // A freshly generated token only makes sense if the gateway requires auth;
   // when it doesn't, the header is ignored server-side. We always pass one so
   // a future auth-enabled runtime works out of the box.
-  const proc = spawn(exe, ['gateway'], { cwd: runtime ?? undefined, env, windowsHide: true })
+  let proc: ChildProcess
+
+  try {
+    proc = spawn(exe, ['gateway'], { cwd: runtime ?? undefined, env, windowsHide: true })
+  } catch (err) {
+    // spawn() can throw synchronously (ENOENT, DLL resolution). The window
+    // must still come up — the renderer shows an honest offline state.
+    console.error('[prime-hermes] gateway spawn failed:', err)
+    gatewayCrashes += 1
+
+    return proc = null as unknown as ChildProcess
+  }
+
   gatewayProc = proc
   gatewayCrashes += 1
+
+  // Never let a failed/errored child crash the main process before the
+  // window exists — log and let the renderer surface the offline state.
+  proc.on('error', (err) => {
+    console.error('[prime-hermes] gateway process error:', err)
+    gatewayProc = null
+
+    if (!shuttingDown) {
+      const delay = Math.min(1000 * 2 ** Math.min(gatewayCrashes, 5), 30_000)
+      setTimeout(() => {
+        if (!shuttingDown) {spawnGateway(base, token)}
+      }, delay)
+    }
+  })
 
   proc.on('exit', (code) => {
     gatewayProc = null
@@ -123,13 +152,18 @@ async function ensureGateway(base: string, token: string): Promise<{ base: strin
 
   const runtime = runtimeDir()
 
-  if (!runtime && process.env.PRIME_NO_EMBEDDED_GATEWAY !== '1') {
-    // Dev: no bundled runtime — let the user run their own gateway; the app
+  if (!runtime) {
+    // No bundled runtime (dev): the user runs their own gateway; the app
     // still works (offline states) and connects once one appears.
     return { base, token, spawned: false }
   }
 
-  spawnGateway(base, token)
+  const spawned = spawnGateway(base, token)
+
+  if (!spawned) {
+    // spawn failed synchronously — don't block the window on a 30s poll.
+    return { base, token, spawned: false }
+  }
 
   // Wait for health: up to 30s, polling every 500ms.
   const deadline = Date.now() + 30_000
@@ -158,12 +192,12 @@ function createWindow(): BrowserWindow {
     minHeight: 600,
     title: 'Prime Hermes',
     backgroundColor: '#101012',
-    icon: join(__dirname, '..', 'assets', 'icon.ico'),
+    icon: join(APP_ROOT, 'assets', 'icon.ico'),
     // A1: custom titlebar — hidden native frame, renderer draws drag region
     // + window controls (min/max/close) via the bridge.
     titleBarStyle: 'hidden',
     webPreferences: {
-      preload: join(__dirname, '..', 'dist', 'electron-preload.js'),
+      preload: join(APP_ROOT, 'dist', 'electron-preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
@@ -175,7 +209,7 @@ function createWindow(): BrowserWindow {
   if (devServer) {
     void win.loadURL(devServer)
   } else {
-    void win.loadFile(join(__dirname, '..', 'dist', 'index.html'))
+    void win.loadFile(join(APP_ROOT, 'dist', 'index.html'))
   }
 
   win.on('closed', () => { win = null })
@@ -184,6 +218,19 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(async () => {
+  // R1: CSP via session headers — applies to file:// renderer without the
+  // meta-tag pitfalls (crossorigin module scripts on file:// are allowed).
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*; object-src 'none'; base-uri 'self'"
+        ]
+      }
+    })
+  })
+
   const gatewayBase = resolveGatewayBase()
   const sessionToken = resolveSessionToken() || `ph-${randomBytes(16).toString('hex')}`
   const gateway = await ensureGateway(gatewayBase, sessionToken)
