@@ -5,6 +5,7 @@
 
 import { lazy, Suspense } from 'react'
 
+import { ConnectionsPane } from './ConnectionsPane'
 import { CostBreakdown } from './CostBreakdown'
 import { CronPane } from './CronPane'
 import { FilesPane } from './FilesPane'
@@ -13,6 +14,7 @@ import { ProfilesPane } from './ProfilesPane'
 import { registerPane } from './registry'
 import { ReviewPane } from './ReviewPane'
 import { SkillsHub } from './SkillsHub'
+import { StarmapPane } from './StarmapPane'
 import { TerminalPane } from './TerminalPane'
 import { ToolsPane } from './ToolsPane'
 import { WebhooksPane } from './WebhooksPane'
@@ -136,6 +138,18 @@ export function registerAllPanes() {
     label: 'Webhooks',
     icon: '🔔',
     render: (props) => <WebhooksPane {...props} />
+  })
+  registerPane({
+    id: 'connections',
+    label: 'Connections',
+    icon: '🔌',
+    render: (props) => <ConnectionsPane {...props} />
+  })
+  registerPane({
+    id: 'starmap',
+    label: 'Starmap',
+    icon: '🗺',
+    render: (props) => <StarmapPane {...props} />
   })
   registerPane({
     id: 'review',
