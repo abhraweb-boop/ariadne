@@ -15,7 +15,7 @@ describe('CostBreakdown', () => {
   })
   it('renders total header', () => {
     render(<CostBreakdown onClose={() => {}} />)
-    expect(screen.getByText('total: 0')).toBeTruthy()
+    expect(screen.getByText(/total: 0/)).toBeTruthy()
   })
   it('renders cost icon', () => {
     render(<CostBreakdown onClose={() => {}} />)

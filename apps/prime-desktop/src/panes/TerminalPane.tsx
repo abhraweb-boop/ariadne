@@ -9,11 +9,12 @@
 
 import { useState } from 'react'
 
-import { post } from '../api'
+import { get, post } from '../api'
 
 export function TerminalPane({ onClose }: { onClose: () => void }) {
   const [opening, setOpening] = useState(false)
   const [result, setResult] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const openTerminal = async () => {
     setOpening(true)
@@ -29,11 +30,23 @@ export function TerminalPane({ onClose }: { onClose: () => void }) {
     }
   }
 
+  const copyPath = async () => {
+    try {
+      const r = await get<{ ok?: boolean; path?: string }>('/api/ariadne/files/list?path=')
+      await navigator.clipboard.writeText(r.path ?? '')
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      setCopied(false)
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>🖥 Terminal</span>
-        <button aria-label="Close" onClick={onClose} style={ghostBtn}></button>
+        <button onClick={() => void copyPath()} style={ghostBtn}>{copied ? 'Copied ✓' : 'Copy path'}</button>
+        <button aria-label="Close" onClick={onClose} style={ghostBtn}>✕</button>
       </div>
 
       <div

@@ -5,6 +5,7 @@
 
 import { lazy, Suspense } from 'react'
 
+import { ArtifactsPane } from './ArtifactsPane'
 import { ConnectionsPane } from './ConnectionsPane'
 import { CostBreakdown } from './CostBreakdown'
 import { CronPane } from './CronPane'
@@ -151,6 +152,12 @@ export function registerAllPanes() {
     label: 'Starmap',
     icon: '🗺',
     render: (props) => <StarmapPane {...props} />
+  })
+  registerPane({
+    id: 'artifacts',
+    label: 'Artifacts',
+    icon: '🖼',
+    render: (props) => <ArtifactsPane {...props} />
   })
   registerPane({
     id: 'self-improve',

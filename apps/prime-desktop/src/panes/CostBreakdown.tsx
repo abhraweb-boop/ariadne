@@ -45,14 +45,35 @@ export function CostBreakdown({ onClose }: { onClose: () => void }) {
     return unsub
   }, [])
 
+  // P: estimated cost (rough $/1K tokens) + threshold alert
+  const estCost = (total / 1000) * 0.003
+  const [threshold, setThreshold] = useState(5)
+  const exceeded = estCost > threshold
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--border, #2a2a2a)' }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>💸 Cost & tokens</span>
         <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted-foreground, #888)', fontVariantNumeric: 'tabular-nums' }}>
-          total: {total.toLocaleString()}
+          total: {total.toLocaleString()} · ~${estCost.toFixed(2)}
         </span>
-        <button aria-label="Close" onClick={onClose} style={ghostBtn}></button>
+        <button aria-label="Close" onClick={onClose} style={ghostBtn}>✕</button>
+      </div>
+
+      {/* P: cost threshold alert */}
+      <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border, #2a2a2a)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 10, color: 'var(--muted-foreground, #888)' }}>Alert if &gt; $</span>
+        <input
+          aria-label="Cost threshold"
+          onChange={(e) => setThreshold(Number(e.target.value) || 0)}
+          style={{ width: 56, padding: '2px 6px', background: 'transparent', border: '1px solid var(--border, #2a2a2a)', borderRadius: 4, color: 'inherit', fontSize: 11, fontFamily: 'inherit' }}
+          value={threshold}
+        />
+        {exceeded && (
+          <span style={{ fontSize: 11, color: '#f7768e', border: '1px solid #f7768e', borderRadius: 999, padding: '1px 8px' }}>
+            exceeded!
+          </span>
+        )}
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
