@@ -55,6 +55,6 @@ describe('Statusbar', () => {
 
   it('renders version footer', () => {
     render(<Statusbar />)
-    expect(screen.getByText(/Prime Hermes v0\.1\.0/)).toBeTruthy()
+    expect(screen.getByText(/Prime Hermes v0\.1\.1/)).toBeTruthy()
   })
 })

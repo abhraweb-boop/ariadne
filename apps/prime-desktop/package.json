@@ -2,7 +2,7 @@
  "name": "prime-desktop",
  "productName": "Prime Hermes",
  "private": true,
- "version": "0.1.0",
+ "version": "0.1.1",
  "description": "Desktop harness for Prime-Hermes: chat-first shell over agents, task DAGs, kernel, graph, and ledger.",
  "author": "Ariadne",
  "type": "module",

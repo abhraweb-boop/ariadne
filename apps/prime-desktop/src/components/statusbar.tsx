@@ -165,7 +165,7 @@ export function Statusbar({
       {/* Right cluster: version + prime-specific widgets */}
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
         {widgets}
-        <span style={{ fontSize: 10, opacity: 0.5 }}>Prime Hermes v0.1.0</span>
+        <span style={{ fontSize: 10, opacity: 0.5 }}>Prime Hermes v0.1.1</span>
       </div>
     </div>
   )
