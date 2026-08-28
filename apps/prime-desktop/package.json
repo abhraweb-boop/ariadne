@@ -67,8 +67,7 @@
    "target": [
     "nsis"
    ],
-   "icon": "assets/icon.ico",
-   "publisherName": "Ariadne"
+   "icon": "assets/icon.ico"
   },
   "linux": {
    "category": "Development",
