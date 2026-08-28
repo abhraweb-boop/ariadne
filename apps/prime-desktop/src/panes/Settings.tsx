@@ -262,6 +262,77 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </span>
       </div>
 
+      {/* S1: live theme preview card */}
+      <div
+        aria-label="Theme preview"
+        style={{
+          border: '1px solid var(--border, #2a2a2a)',
+          borderRadius: 8,
+          overflow: 'hidden',
+          marginBottom: 16,
+          background: prefs.mode === 'dark' ? '#101012' : '#f5f5f7'
+        }}
+      >
+        <div style={{ height: 24, borderBottom: '1px solid var(--border, #e2e2e4)', display: 'flex', alignItems: 'center', padding: '0 10px', gap: 4 }}>
+          <span style={{ width: 6, height: 6, borderRadius: 3, background: ACCENTS[prefs.accent] }} />
+          <span style={{ fontSize: 9, color: prefs.mode === 'dark' ? '#888' : '#6b6b70' }}>Prime Hermes</span>
+        </div>
+        <div style={{ display: 'flex' }}>
+          <div style={{ width: 48, padding: 8, borderRight: '1px solid var(--border, #e2e2e4)' }}>
+            <div style={{ width: '100%', height: 6, borderRadius: 3, background: ACCENTS[prefs.accent], marginBottom: 5 }} />
+            <div style={{ width: '70%', height: 4, borderRadius: 2, background: 'color-mix(in srgb, #888 40%, transparent)', marginBottom: 4 }} />
+            <div style={{ width: '80%', height: 4, borderRadius: 2, background: 'color-mix(in srgb, #888 40%, transparent)', marginBottom: 4 }} />
+            <div style={{ width: '60%', height: 4, borderRadius: 2, background: 'color-mix(in srgb, #888 40%, transparent)' }} />
+          </div>
+          <div style={{ flex: 1, padding: 10 }}>
+            <div
+              style={{
+                maxWidth: '75%',
+                marginLeft: 'auto',
+                borderRadius: 6,
+                padding: '5px 8px',
+                background: 'color-mix(in srgb, ' + ACCENTS[prefs.accent] + ' 15%, transparent)',
+                fontSize: 9,
+                color: prefs.mode === 'dark' ? '#efefef' : '#1c1c1e'
+              }}
+            >
+              hello from the agent
+            </div>
+            <div
+              style={{
+                maxWidth: '75%',
+                marginTop: 6,
+                borderRadius: 6,
+                padding: '5px 8px',
+                border: '1px solid var(--border, #e2e2e4)',
+                fontSize: 9,
+                color: prefs.mode === 'dark' ? '#efefef' : '#1c1c1e'
+              }}
+            >
+              done in 2.4s
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* S2: reset all data */}
+      <button
+        onClick={() => {
+          if (window.confirm('Reset all Prime Hermes data? Theme, layout and onboarding state will be cleared.')) {
+            try { localStorage.removeItem(THEME_STORAGE_KEY) } catch { /* ignore */ }
+
+            try { localStorage.removeItem('prime-hermes:onboarding-done') } catch { /* ignore */ }
+
+            try { localStorage.removeItem('prime-hermes-last-seen-at') } catch { /* ignore */ }
+            window.location.reload()
+          }
+        }}
+        style={{ ...ghostBtn, color: '#f7768e', borderColor: '#f7768e' }}
+        type="button"
+      >
+        Reset all data
+      </button>
+
       <div style={{ fontSize: 11, color: 'var(--muted-foreground, #888)', marginBottom: 6 }}>
         Per-surface model routing (S6) — stored locally
       </div>

@@ -51,3 +51,33 @@ describe('Settings', () => {
     expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#3f9e6a')
   })
 })
+
+describe('S1+S2', () => {
+  it('renders the theme preview card', async () => {
+    render(<Settings onClose={() => {}} />)
+    expect(await screen.findByLabelText('Theme preview')).toBeTruthy()
+  })
+
+  it('reset button clears known keys when confirmed', async () => {
+    const removeSpy = vi.spyOn(Storage.prototype, 'removeItem')
+    const reloadSpy = vi.fn()
+    vi.stubGlobal('location', { reload: reloadSpy })
+    ;(window as unknown as Record<string, unknown>).confirm = vi.fn().mockReturnValue(true)
+    render(<Settings onClose={() => {}} />)
+    fireEvent.click(await screen.findByText('Reset all data'))
+    expect(removeSpy).toHaveBeenCalledWith('prime-hermes:theme:prefs')
+    expect(removeSpy).toHaveBeenCalledWith('prime-hermes:onboarding-done')
+    expect(reloadSpy).toHaveBeenCalled()
+    removeSpy.mockRestore()
+  })
+
+  it('reset does nothing when confirm is declined', async () => {
+    const removeSpy = vi.spyOn(Storage.prototype, 'removeItem')
+
+    ;(window as unknown as Record<string, unknown>).confirm = vi.fn().mockReturnValue(false)
+    render(<Settings onClose={() => {}} />)
+    fireEvent.click(await screen.findByText('Reset all data'))
+    expect(removeSpy).not.toHaveBeenCalled()
+    removeSpy.mockRestore()
+  })
+})
