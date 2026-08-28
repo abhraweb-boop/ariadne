@@ -51,6 +51,16 @@ interface Message {
 }
 
 // S5: detached-execution resume banner state
+
+function messageTime(id: string): string {
+  const match = id.match(/^msg-(\d+)/)
+
+  if (!match) {return ''}
+  const d = new Date(Number(match[1]))
+
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
 interface FinishedAwayPlan {
   id: string
   goal: string
@@ -79,6 +89,7 @@ export function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [contextPct, setContextPct] = useState<number | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const sessionIdRef = useRef<string | null>(null)
   // Keep ref in sync with sessionId
@@ -237,6 +248,25 @@ export function App() {
     return installShortcuts()
   }, [])
 
+  // C: poll context usage from prime state
+  useEffect(() => {
+    const poll = () => {
+      void get<{ ok: boolean; state: { tokensUsed?: number } }>('/api/prime/state')
+        .then((r) => {
+          if (r.ok && typeof r.state?.tokensUsed === 'number') {
+            const pct = Math.round((r.state.tokensUsed / 64000) * 100)
+            setContextPct(pct)
+          }
+        })
+        .catch(() => {})
+    }
+
+    poll()
+    const interval = setInterval(poll, 30000)
+
+    return () => clearInterval(interval)
+  }, [])
+
   // Auto-scroll
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
@@ -255,6 +285,20 @@ export function App() {
       setSending(false)
     }
   }, [input, sending])
+
+  /** C: send a specific text — used by regenerate (bypasses the composer). */
+  const sendText = useCallback(async (text: string) => {
+    if (!text || sending) {return}
+    setSending(true)
+    setMessages((prev) => streamReducer(prev, { type: 'user', text }))
+
+    try {
+      await post('/api/prime/prompt', { prompt: text })
+    } catch (e) {
+      setMessages((prev) => streamReducer(prev, { type: 'system', text: `Error: ${String(e)}` }))
+      setSending(false)
+    }
+  }, [sending])
 
   const openPane = useCallback((id: string) => {
     setOpenPaneId((prev) => (prev === id ? null : id))
@@ -396,6 +440,24 @@ export function App() {
                   Select a session or start typing below. The composer sends to the Prime worker.
                 </p>
               )}
+              {contextPct !== null && contextPct > 70 && (
+                <div
+                  style={{
+                    alignSelf: 'center',
+                    fontSize: 10,
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    background: contextPct > 90
+                      ? 'color-mix(in srgb, #f7768e 20%, transparent)'
+                      : 'color-mix(in srgb, #e0af68 20%, transparent)',
+                    color: contextPct > 90 ? '#f7768e' : '#e0af68',
+                    border: '1px solid ' + (contextPct > 90 ? '#f7768e' : '#e0af68'),
+                    marginBottom: 10
+                  }}
+                >
+                  context {contextPct}%
+                </div>
+              )}
               {messages.map((m) => (
                 <div
                   key={m.id}
@@ -437,6 +499,33 @@ export function App() {
                     {/* B3: streaming caret on the last assistant message */}
                     {sending && m.role === 'assistant' && m.id === messages[messages.length - 1]?.id && (
                       <StreamingCaret />
+                    )}
+                  </div>
+                  {/* C: message actions row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: 10, color: 'var(--muted-foreground, #888)' }}>
+                    <span>{messageTime(m.id)}</span>
+                    <button
+                      aria-label="Copy message"
+                      onClick={() => void navigator.clipboard.writeText(m.text)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground, #888)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 10, padding: 0 }}
+                    >⧉</button>
+                    {m.role === 'user' && m.id === messages[messages.length - 1]?.id && !sending && (
+                      <button
+                        aria-label="Edit message"
+                        onClick={() => { setInput(m.text); endRef.current?.scrollIntoView() }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground, #888)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 10, padding: 0 }}
+                      >✎</button>
+                    )}
+                    {m.role === 'assistant' && m.id === messages[messages.length - 1]?.id && !sending && (
+                      <button
+                        aria-label="Regenerate"
+                        onClick={() => {
+                          const lastUser = [...messages].reverse().find((x) => x.role === 'user')
+
+                          if (lastUser) { sendText(lastUser.text) }
+                        }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground, #888)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 10, padding: 0 }}
+                      >↻</button>
                     )}
                   </div>
                   {m.cards?.map((c, i) => {
