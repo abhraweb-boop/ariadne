@@ -97,7 +97,7 @@
   "publish": {
    "provider": "github",
    "owner": "abhraweb-boop",
-   "repo": "prime-hermes-desktop",
+   "repo": "ariadne",
    "releaseType": "release"
   }
  }
